@@ -29,8 +29,11 @@ export class DiceRenderer {
   private raycaster = new THREE.Raycaster();
   private resizeObserver: ResizeObserver;
   private meshes = new Map<DiceId, THREE.Mesh>();
+  private selected = new Set<THREE.Mesh>();
   private prev: DieSnapshot[] = [];
   private tweens: Tween[] = [];
+  private tweenMeshes = new Set<THREE.Mesh>();
+  private tweenStart = 0;
   private rafId: number | null = null;
   private hasDice = false;
 
@@ -85,16 +88,21 @@ export class DiceRenderer {
     const transitions = computeTransitions(this.prev, next);
     this.prev = next;
 
+    this.selected.clear();
     for (const die of state.dice) {
       const mesh = this.ensureMesh(die.id, die.value);
-      this.applySelection(mesh, die.selected);
+      if (die.selected) this.selected.add(mesh);
     }
 
-    if (transitions.length > 0) {
-      this.animate(transitions);
-    } else {
-      this.render();
+    for (const mesh of this.meshes.values()) {
+      if (!this.selected.has(mesh) && !this.tweenMeshes.has(mesh)) {
+        mesh.rotation.set(0, 0, 0);
+      }
     }
+
+    if (transitions.length > 0) this.animate(transitions);
+    if (this.selected.size > 0) this.ensureLoop();
+    this.render();
   }
 
   private snapshots(state: GameState): DieSnapshot[] {
@@ -120,14 +128,6 @@ export class DiceRenderer {
       this.scene.add(mesh);
     }
     return mesh;
-  }
-
-  private applySelection(mesh: THREE.Mesh, selected: boolean): void {
-    const materials = mesh.material as THREE.MeshStandardMaterial[];
-    for (const material of materials) {
-      material.emissive.setHex(selected ? 0x661111 : 0x000000);
-    }
-    mesh.scale.setScalar(selected ? 1.12 : 1);
   }
 
   private animate(transitions: Transition[]): void {
@@ -158,40 +158,35 @@ export class DiceRenderer {
       }
     }
 
+    for (const tween of tweens) this.tweenMeshes.add(tween.mesh);
     this.tweens = tweens;
-    const start = performance.now();
+    this.tweenStart = performance.now();
+    this.ensureLoop();
+  }
 
-    const step = (now: number) => {
-      const t = Math.min(1, (now - start) / ANIMATION_DURATION_MS);
-      const e = 1 - Math.pow(1 - t, 3);
+  private stepTweens(now: number): void {
+    if (this.tweens.length === 0) return;
+    const t = Math.min(1, (now - this.tweenStart) / ANIMATION_DURATION_MS);
+    const e = 1 - Math.pow(1 - t, 3);
 
-      for (const tween of this.tweens) {
-        if (tween.kind === 'appear') {
-          tween.mesh.scale.setScalar(e);
-        } else if (tween.kind === 'remove') {
-          tween.mesh.scale.setScalar(1 - e);
-        } else {
-          tween.mesh.position.x = tween.fromX + (tween.toX - tween.fromX) * e;
-          tween.mesh.position.y = tween.fromY + (tween.toY - tween.fromY) * e;
-          tween.mesh.rotation.x = e * Math.PI * 2;
-          tween.mesh.rotation.y = e * Math.PI * 2;
-          if (!tween.valueApplied && t >= 0.5) {
-            setD6Value(tween.mesh, tween.toValue);
-            tween.valueApplied = true;
-          }
+    for (const tween of this.tweens) {
+      if (tween.kind === 'appear') {
+        tween.mesh.scale.setScalar(e);
+      } else if (tween.kind === 'remove') {
+        tween.mesh.scale.setScalar(1 - e);
+      } else {
+        tween.mesh.position.x = tween.fromX + (tween.toX - tween.fromX) * e;
+        tween.mesh.position.y = tween.fromY + (tween.toY - tween.fromY) * e;
+        tween.mesh.rotation.x = e * Math.PI * 2;
+        tween.mesh.rotation.y = e * Math.PI * 2;
+        if (!tween.valueApplied && t >= 0.5) {
+          setD6Value(tween.mesh, tween.toValue);
+          tween.valueApplied = true;
         }
       }
+    }
 
-      this.render();
-
-      if (t < 1) {
-        this.rafId = requestAnimationFrame(step);
-      } else {
-        this.finalizeAnimation();
-      }
-    };
-
-    this.rafId = requestAnimationFrame(step);
+    if (t >= 1) this.finalizeAnimation();
   }
 
   private finalizeAnimation(): void {
@@ -209,11 +204,31 @@ export class DiceRenderer {
       }
     }
     this.tweens = [];
-    if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId);
-      this.rafId = null;
+    this.tweenMeshes.clear();
+  }
+
+  private applyShake(now: number): void {
+    if (this.selected.size === 0) return;
+    const t = now / 1000;
+    for (const mesh of this.selected) {
+      if (this.tweenMeshes.has(mesh)) continue;
+      mesh.rotation.z = Math.sin(t * 55) * 0.08;
+      mesh.rotation.x = Math.sin(t * 41) * 0.05;
     }
   }
+
+  private ensureLoop(): void {
+    if (this.rafId === null) this.rafId = requestAnimationFrame(this.tick);
+  }
+
+  private tick = (now: number) => {
+    this.stepTweens(now);
+    this.applyShake(now);
+    this.render();
+
+    const active = this.tweens.length > 0 || this.selected.size > 0;
+    this.rafId = active ? requestAnimationFrame(this.tick) : null;
+  };
 
   render(): void {
     this.renderer.render(this.scene, this.camera);
@@ -246,6 +261,7 @@ export class DiceRenderer {
   }
 
   dispose(): void {
+    if (this.rafId !== null) cancelAnimationFrame(this.rafId);
     this.finalizeAnimation();
     this.resizeObserver.disconnect();
     this.renderer.dispose();
