@@ -13,6 +13,7 @@ export interface GameEngine {
   canRedo(): boolean;
   beginTransaction(): void;
   endTransaction(): void;
+  restore(state: GameState): void;
 }
 
 export function createEngine(deps: EngineDeps, initial: GameState = createInitialState()): GameEngine {
@@ -97,6 +98,13 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
       inTransaction = false;
       transactionPushed = false;
       lastAction = null;
+    },
+    restore(restored: GameState) {
+      state = restored;
+      undoStack.length = 0;
+      redoStack = [];
+      lastAction = null;
+      notify();
     },
   };
 }
