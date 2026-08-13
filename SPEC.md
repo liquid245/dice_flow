@@ -88,13 +88,11 @@ It rolls the selected dice and removes all dice that are not selected — they n
 
 The Roll button is inactive when no dice are selected.
 
-To reroll all dice without a selection, use "Reroll All" (see ReRoll).
-
 ### ReRoll
 
 Rerolls the selected dice within the current iteration.
 
-"Reroll All" rerolls every die on the table without requiring a selection.
+If no dice are selected, ReRoll rerolls every die on the table.
 
 ### Add
 
@@ -162,9 +160,7 @@ Undo and Redo operate on gameplay state.
 
 They have unlimited depth within the session.
 
-Undo and Redo apply only to changes of dice values, not to selection.
-
-Undo and Redo are not displayed in user-facing gameplay History.
+Undo and Redo navigate the action history: every action, including selection and Clear, can be undone.
 
 After a new action is performed following Undo, the abandoned Redo branch is removed.
 
@@ -172,11 +168,9 @@ Consecutive identical actions coalesce into a single undoable step. For example,
 
 ## History
 
-History describes the gameplay process.
+History records every action the player performs: Roll, ReRoll, Add, Delete, Move, Select and Clear.
 
-Undo and Redo are not recorded.
-
-One visible history line represents one roll iteration.
+Undo and Redo navigate this same history and are not recorded as separate entries.
 
 Example:
 
@@ -234,7 +228,6 @@ The main action bar contains:
 
 Roll
 ReRoll
-Reroll All
 Add X
 Move X
 
@@ -247,7 +240,7 @@ When no dice are selected:
 
 Roll is inactive.
 
-Reroll All rerolls every die.
+ReRoll rerolls every die.
 
 Add displays `1`.
 

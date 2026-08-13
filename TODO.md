@@ -62,19 +62,18 @@ AI не должен самостоятельно расширять задач�
 
 ## Движок (Core)
 
-- [ ] Определить типы кубика (src/core/dice/types.ts): DiceId = string; DiceType = 'd6'; OperationKind = 'roll' | 'reroll' | 'add' | 'move'; Die { id, type, value, selected, origin }
-- [ ] Определить GameState (src/core/game/state.ts): { dice: Die[]; history: HistoryEntry[]; swipeAddAvailable: boolean }
-- [ ] Определить EngineDeps { random, nextId, now } и Action union (src/core/actions/types.ts): roll | reroll | rerollAll | add{count, values?} | delete{count?} | move{targetValue} | select{ids, mode} | clear | undo | redo
-- [ ] Реализовать чистую функцию reduce(state, action, deps) (src/core/game/reducer.ts)
-- [ ] Реализовать add: случайные значения (+N), опциональные явные значения для восстановления при свайпе + тесты
-- [ ] Реализовать delete: выбранные или последний добавленный + тесты
-- [ ] Реализовать roll: новая итерация — бросок выбранных, удаление невыбранных + тесты
-- [ ] Реализовать reroll: переброс выбранных в той же итерации + тесты
-- [ ] Реализовать rerollAll: переброс всех кубиков + тесты
-- [ ] Реализовать move: перемещение выбранных в целевую группу + тесты
-- [ ] Реализовать select: set/toggle + тесты
-- [ ] Реализовать clear: очистка стола + swipeAddAvailable = true + тесты
-- [ ] Реализовать undo/redo: снапшоты, только изменения значений кубиков, коалесцирование одинаковых действий + тесты
-- [ ] Реализовать History: итерации + шаги, отдельно от undo/redo + тесты
-- [ ] Реализовать селекторы: groupByValue, selectedDice, counts + тесты
-- [ ] Реализовать движок createEngine: dispatch, subscribe, canUndo/canRedo + тесты
+- [x] Определить типы кубика (src/core/dice/types.ts): DiceId = string; DiceType = 'd6'; OperationKind = 'roll' | 'reroll' | 'add' | 'move'; Die { id, type, value, selected, origin }
+- [x] Определить GameState (src/core/game/state.ts): { dice: Die[]; history: HistoryEntry[]; swipeAddAvailable: boolean }
+- [x] Определить EngineDeps { random, nextId, now } и Action union (src/core/actions/types.ts): roll | reroll | add{count, values?} | delete{count?} | move{targetValue} | select{ids, mode} | clear | undo | redo
+- [x] Реализовать чистую функцию reduce(state, action, deps) (src/core/game/reducer.ts)
+- [x] Реализовать add: случайные значения (+N), опциональные явные значения для восстановления при свайпе + тесты
+- [x] Реализовать delete: выбранные или последний добавленный + тесты
+- [x] Реализовать roll: новая итерация — бросок выбранных, удаление невыбранных + тесты
+- [x] Реализовать reroll: переброс выбранных (или всех, если ничего не выбрано) + тесты
+- [x] Реализовать move: перемещение выбранных в целевую группу + тесты
+- [x] Реализовать select: set/toggle/add/remove + тесты
+- [x] Реализовать clear: очистка стола + swipeAddAvailable = true + тесты
+- [x] Реализовать undo/redo: навигация по истории действий (все действия отменяемы), коалесцирование одинаковых действий + тесты
+- [x] Реализовать History: плоский лог всех действий (roll/reroll/add/delete/move/select/clear) + тесты
+- [x] Реализовать селекторы: groupByValue, selectedDice, counts + тесты
+- [x] Реализовать движок createEngine: dispatch, subscribe, canUndo/canRedo, beginTransaction/endTransaction + тесты

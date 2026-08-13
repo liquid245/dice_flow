@@ -93,7 +93,6 @@ Current actions:
 
 - Roll
 - ReRoll
-- Reroll All
 - Add
 - Delete
 - Move
@@ -116,7 +115,6 @@ MVP features:
 
 - Roll
 - ReRoll
-- Reroll All
 - Add
 - Delete
 - Move
@@ -207,7 +205,6 @@ At minimum, test:
 
 - Roll
 - ReRoll
-- Reroll All
 - Add
 - Delete
 - Move
