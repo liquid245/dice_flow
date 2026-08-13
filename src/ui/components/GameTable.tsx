@@ -1,15 +1,23 @@
+import { useEffect, useRef } from 'react';
 import { groupByValue } from '../../core/groups/groups';
 import { useGame } from '../../app/game';
 import { useSwipeAdd } from '../../input/useSwipeAdd';
+import { TapCycleController, visualOrder } from '../../input/tapCycle';
 
 const GROUP_VALUES = [6, 5, 4, 3, 2, 1];
 
 export function GameTable() {
   const { state, dispatch, beginTransaction, endTransaction } = useGame();
+  const cycleRef = useRef(new TapCycleController());
   const swipe = useSwipeAdd(
     { dispatch, beginTransaction, endTransaction },
     () => state.swipeAddAvailable && state.dice.length === 0,
   );
+
+  const selectedCount = state.dice.filter((d) => d.selected).length;
+  useEffect(() => {
+    if (selectedCount === 0) cycleRef.current.reset();
+  }, [selectedCount]);
 
   if (state.dice.length === 0) {
     return (
@@ -20,6 +28,7 @@ export function GameTable() {
   }
 
   const groups = groupByValue(state.dice);
+  const order = visualOrder(state.dice);
 
   return (
     <div className="table" {...swipe}>
@@ -29,7 +38,10 @@ export function GameTable() {
           <div
             key={value}
             className="group"
-            onClick={() => dispatch({ type: 'select', ids: dice.map((d) => d.id), mode: 'set' })}
+            onClick={() => {
+              cycleRef.current.reset();
+              dispatch({ type: 'select', ids: dice.map((d) => d.id), mode: 'set' });
+            }}
           >
             <span className="group-label">{value}</span>
             <div className="dice">
@@ -39,7 +51,7 @@ export function GameTable() {
                   className={die.selected ? 'die selected' : 'die'}
                   onClick={(event) => {
                     event.stopPropagation();
-                    dispatch({ type: 'select', ids: [die.id], mode: 'toggle' });
+                    dispatch(cycleRef.current.tap(order, die.id));
                   }}
                 >
                   {die.value}
