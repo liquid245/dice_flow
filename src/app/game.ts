@@ -16,5 +16,6 @@ export function useGame() {
     canRedo: engine.canRedo,
     beginTransaction: engine.beginTransaction,
     endTransaction: engine.endTransaction,
+    getState: engine.getState,
   };
 }

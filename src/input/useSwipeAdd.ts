@@ -1,14 +1,8 @@
 import { useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import type { Action } from '../core/actions/types';
 import { rollD6 } from '../core/dice/roll';
 import { SwipeAddSession } from './swipeAdd';
-
-export interface SwipeAddEngine {
-  dispatch(action: Action): void;
-  beginTransaction(): void;
-  endTransaction(): void;
-}
+import type { InputEngine } from './engine';
 
 const PIXELS_PER_DIE = 28;
 
@@ -18,7 +12,7 @@ interface Gesture {
   active: boolean;
 }
 
-export function useSwipeAdd(engine: SwipeAddEngine, enabled: () => boolean) {
+export function useSwipeAdd(engine: InputEngine, enabled: () => boolean) {
   const gesture = useRef<Gesture | null>(null);
 
   function begin(event: ReactPointerEvent<HTMLDivElement>) {
