@@ -148,10 +148,10 @@ export class DiceRenderer {
       halfWidth = halfHeight * aspect;
     }
 
-    this.camera.left = centerX - halfWidth;
-    this.camera.right = centerX + halfWidth;
-    this.camera.top = centerY + halfHeight;
-    this.camera.bottom = centerY - halfHeight;
+    this.camera.left = -halfWidth;
+    this.camera.right = halfWidth;
+    this.camera.top = halfHeight;
+    this.camera.bottom = -halfHeight;
     this.camera.position.set(centerX, centerY, 10);
     this.camera.lookAt(centerX, centerY, 0);
     this.camera.updateProjectionMatrix();
