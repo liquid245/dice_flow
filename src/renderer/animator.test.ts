@@ -16,9 +16,15 @@ describe('computeTransitions', () => {
     expect(computeTransitions([snap('a', 3)], [])).toEqual([{ kind: 'remove', id: 'a', x: 0, y: 0 }]);
   });
 
-  it('marks value or position change', () => {
+  it('marks value change as change', () => {
     expect(computeTransitions([snap('a', 3, 0, 0)], [snap('a', 5, 0, -2)])).toEqual([
       { kind: 'change', id: 'a', fromX: 0, fromY: 0, toX: 0, toY: -2, fromValue: 3, toValue: 5 },
+    ]);
+  });
+
+  it('marks position-only change as slide', () => {
+    expect(computeTransitions([snap('a', 5, -1.3, -2)], [snap('a', 5, 0, -2)])).toEqual([
+      { kind: 'slide', id: 'a', fromX: -1.3, fromY: -2, toX: 0, toY: -2 },
     ]);
   });
 

@@ -17,7 +17,8 @@ export type Transition =
       toY: number;
       fromValue: number;
       toValue: number;
-    };
+    }
+  | { kind: 'slide'; id: string; fromX: number; fromY: number; toX: number; toY: number };
 
 export function computeTransitions(prev: DieSnapshot[], next: DieSnapshot[]): Transition[] {
   const prevById = new Map(prev.map((p) => [p.id, p]));
@@ -28,7 +29,7 @@ export function computeTransitions(prev: DieSnapshot[], next: DieSnapshot[]): Tr
     const p = prevById.get(n.id);
     if (!p) {
       transitions.push({ kind: 'appear', id: n.id, x: n.x, y: n.y, value: n.value });
-    } else if (p.value !== n.value || p.x !== n.x || p.y !== n.y) {
+    } else if (p.value !== n.value) {
       transitions.push({
         kind: 'change',
         id: n.id,
@@ -39,6 +40,8 @@ export function computeTransitions(prev: DieSnapshot[], next: DieSnapshot[]): Tr
         fromValue: p.value,
         toValue: n.value,
       });
+    } else if (p.x !== n.x || p.y !== n.y) {
+      transitions.push({ kind: 'slide', id: n.id, fromX: p.x, fromY: p.y, toX: n.x, toY: n.y });
     }
   }
 

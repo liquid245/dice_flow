@@ -11,6 +11,7 @@ const ANIMATION_DURATION_MS = 400;
 type Tween =
   | { kind: 'appear'; mesh: THREE.Mesh }
   | { kind: 'remove'; mesh: THREE.Mesh }
+  | { kind: 'slide'; mesh: THREE.Mesh; fromX: number; fromY: number; toX: number; toY: number }
   | {
       kind: 'change';
       mesh: THREE.Mesh;
@@ -141,6 +142,18 @@ export class DiceRenderer {
       } else if (transition.kind === 'remove') {
         const mesh = this.meshes.get(transition.id);
         if (mesh) tweens.push({ kind: 'remove', mesh });
+      } else if (transition.kind === 'slide') {
+        const mesh = this.meshes.get(transition.id);
+        if (!mesh) continue;
+        mesh.position.set(transition.fromX, transition.fromY, 0);
+        tweens.push({
+          kind: 'slide',
+          mesh,
+          fromX: transition.fromX,
+          fromY: transition.fromY,
+          toX: transition.toX,
+          toY: transition.toY,
+        });
       } else {
         const mesh = this.ensureMesh(transition.id, transition.fromValue);
         setD6Value(mesh, transition.fromValue);
@@ -172,8 +185,13 @@ export class DiceRenderer {
     for (const tween of this.tweens) {
       if (tween.kind === 'appear') {
         tween.mesh.scale.setScalar(e);
+        tween.mesh.rotation.x = e * Math.PI * 2;
+        tween.mesh.rotation.y = e * Math.PI * 2;
       } else if (tween.kind === 'remove') {
         tween.mesh.scale.setScalar(1 - e);
+      } else if (tween.kind === 'slide') {
+        tween.mesh.position.x = tween.fromX + (tween.toX - tween.fromX) * e;
+        tween.mesh.position.y = tween.fromY + (tween.toY - tween.fromY) * e;
       } else {
         tween.mesh.position.x = tween.fromX + (tween.toX - tween.fromX) * e;
         tween.mesh.position.y = tween.fromY + (tween.toY - tween.fromY) * e;
@@ -193,9 +211,12 @@ export class DiceRenderer {
     for (const tween of this.tweens) {
       if (tween.kind === 'appear') {
         tween.mesh.scale.setScalar(1);
+        tween.mesh.rotation.set(0, 0, 0);
       } else if (tween.kind === 'remove') {
         this.scene.remove(tween.mesh);
         this.meshes.delete(tween.mesh.userData.dieId as string);
+      } else if (tween.kind === 'slide') {
+        tween.mesh.position.set(tween.toX, tween.toY, 0);
       } else {
         tween.mesh.position.set(tween.toX, tween.toY, 0);
         tween.mesh.rotation.set(0, 0, 0);
