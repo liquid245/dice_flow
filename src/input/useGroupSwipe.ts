@@ -1,9 +1,9 @@
 import { useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { InputEngine } from './engine';
+import type { HitTest } from './hitTest';
 import { exceedsThreshold } from './dragMove';
 import { selectRangeGroups } from './groupSwipe';
-import { targetValueAt } from './dom';
 
 interface GroupSwipeState {
   startValue: number;
@@ -12,17 +12,14 @@ interface GroupSwipeState {
   dragging: boolean;
 }
 
-export function useGroupSwipe(engine: InputEngine) {
+export function useGroupSwipe(engine: InputEngine, hitTest: HitTest) {
   const state = useRef<GroupSwipeState | null>(null);
 
   function down(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.pointerType !== 'touch' && event.pointerType !== 'mouse') return;
-    const target = event.target as HTMLElement;
-    if (target.closest?.('.die')) return;
-    const group = target.closest?.('.group');
-    if (!group) return;
-    const value = Number(group.getAttribute('data-value'));
-    if (Number.isNaN(value)) return;
+    if (hitTest.dieAt(event.clientX, event.clientY)) return;
+    const value = hitTest.groupAt(event.clientX, event.clientY);
+    if (value === undefined) return;
     state.current = {
       startValue: value,
       startX: event.clientX,
@@ -45,10 +42,15 @@ export function useGroupSwipe(engine: InputEngine) {
     const s = state.current;
     if (!s) return;
     state.current = null;
-    if (!s.dragging) return;
-    const endValue = targetValueAt(event.clientX, event.clientY);
+
+    const dice = engine.getState().dice;
+    if (!s.dragging) {
+      engine.dispatch(selectRangeGroups(dice, s.startValue, s.startValue));
+      return;
+    }
+    const endValue = hitTest.groupAt(event.clientX, event.clientY);
     if (endValue === undefined) return;
-    engine.dispatch(selectRangeGroups(engine.getState().dice, s.startValue, endValue));
+    engine.dispatch(selectRangeGroups(dice, s.startValue, endValue));
   }
 
   function cancel() {

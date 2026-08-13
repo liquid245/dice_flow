@@ -1,8 +1,8 @@
 import { useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { InputEngine } from './engine';
+import type { HitTest } from './hitTest';
 import { exceedsThreshold, moveTarget } from './dragMove';
-import { targetValueAt } from './dom';
 
 interface DragState {
   dieId: string;
@@ -12,20 +12,16 @@ interface DragState {
   dragging: boolean;
 }
 
-export function useDragMove(engine: InputEngine) {
+export function useDragMove(engine: InputEngine, hitTest: HitTest, onTap: (dieId: string) => void) {
   const drag = useRef<DragState | null>(null);
 
   function down(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.pointerType !== 'touch' && event.pointerType !== 'mouse') return;
-    const target = event.target as HTMLElement;
-    const die = target.closest?.('.die');
+    const die = hitTest.dieAt(event.clientX, event.clientY);
     if (!die) return;
-    const dieId = die.getAttribute('data-die-id');
-    const startValue = Number(die.getAttribute('data-die-value'));
-    if (!dieId || Number.isNaN(startValue)) return;
     drag.current = {
-      dieId,
-      startValue,
+      dieId: die.id,
+      startValue: die.value,
       startX: event.clientX,
       startY: event.clientY,
       dragging: false,
@@ -46,9 +42,12 @@ export function useDragMove(engine: InputEngine) {
     const d = drag.current;
     if (!d) return;
     drag.current = null;
-    if (!d.dragging) return;
+    if (!d.dragging) {
+      onTap(d.dieId);
+      return;
+    }
 
-    const target = targetValueAt(event.clientX, event.clientY);
+    const target = hitTest.groupAt(event.clientX, event.clientY);
     engine.beginTransaction();
     engine.dispatch({ type: 'select', ids: [d.dieId], mode: 'add' });
     const selectedCount = engine.getState().dice.filter((x) => x.selected).length;
