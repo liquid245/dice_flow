@@ -14,6 +14,10 @@ export function groupY(value: number): number {
   return (value - 6) * GROUP_SPACING;
 }
 
+export const TABLE_HALF_WIDTH = ((MAX_PER_ROW - 1) * DIE_SPACING) / 2 + 1.2;
+export const TABLE_HALF_HEIGHT = (groupY(6) - groupY(1)) / 2 + 1.2;
+export const TABLE_CENTER_Y = (groupY(6) + groupY(1)) / 2;
+
 export function valueFromY(y: number): number {
   const rowIndex = Math.round(-y / GROUP_SPACING);
   return Math.max(1, Math.min(6, 6 - rowIndex));

@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import type { Die } from '../core/dice/types';
-import { groupY, valueFromY, layoutPositions, MAX_PER_ROW } from './layout';
+import {
+  groupY,
+  valueFromY,
+  layoutPositions,
+  MAX_PER_ROW,
+  TABLE_HALF_WIDTH,
+  TABLE_HALF_HEIGHT,
+  TABLE_CENTER_Y,
+} from './layout';
 
 function die(id: string, value: number): Die {
   return { id, type: 'd6', value, selected: false, origin: 'add' };
@@ -47,5 +55,16 @@ describe('layoutPositions', () => {
     const dice = Array.from({ length: MAX_PER_ROW + 2 }, (_, i) => die(`d${i}`, 3));
     const positions = layoutPositions(dice);
     expect(positions.get(`d${MAX_PER_ROW}`)?.y).toBeLessThan(positions.get('d0')!.y);
+  });
+});
+
+describe('table extent', () => {
+  it('centers the table between groups 6 and 1', () => {
+    expect(TABLE_CENTER_Y).toBe(-5);
+  });
+
+  it('covers the full group span with margin', () => {
+    expect(TABLE_HALF_HEIGHT).toBeGreaterThan(5);
+    expect(TABLE_HALF_WIDTH).toBeGreaterThan(4);
   });
 });

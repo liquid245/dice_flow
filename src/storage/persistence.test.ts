@@ -77,4 +77,32 @@ describe('initPersistence', () => {
     vi.advanceTimersByTime(500);
     expect(storage.saveGame).not.toHaveBeenCalled();
   });
+
+  it('flushes a pending save when the document becomes hidden', () => {
+    const engine = fakeEngine(empty());
+    const storage = fakeStorage(null);
+
+    const listeners: Record<string, () => void> = {};
+    const documentStub = {
+      visibilityState: 'visible',
+      addEventListener: (event: string, fn: () => void) => {
+        listeners[event] = fn;
+      },
+      removeEventListener: vi.fn(),
+    };
+    vi.stubGlobal('document', documentStub);
+    vi.stubGlobal('window', {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+
+    initPersistence(engine, storage);
+    engine.emit();
+    documentStub.visibilityState = 'hidden';
+    listeners.visibilitychange();
+
+    expect(storage.saveGame).toHaveBeenCalledTimes(1);
+
+    vi.unstubAllGlobals();
+  });
 });

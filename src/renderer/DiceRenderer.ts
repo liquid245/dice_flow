@@ -2,7 +2,13 @@ import * as THREE from 'three';
 import type { GameState } from '../core/game/state';
 import type { DiceId } from '../core/dice/types';
 import { createD6Mesh, setD6Value } from './dice';
-import { layoutPositions, valueFromY } from './layout';
+import {
+  layoutPositions,
+  valueFromY,
+  TABLE_HALF_WIDTH,
+  TABLE_HALF_HEIGHT,
+  TABLE_CENTER_Y,
+} from './layout';
 import { computeTransitions, type DieSnapshot, type Transition } from './animator';
 import type { DieHit } from '../input/hitTest';
 
@@ -71,12 +77,25 @@ export class DiceRenderer {
     const width = this.container.clientWidth || 1;
     const height = this.container.clientHeight || 1;
     this.renderer.setSize(width, height, false);
-    const halfHeight = 7;
-    const halfWidth = halfHeight * (width / height);
+
+    const aspect = width / height;
+    const tableAspect = TABLE_HALF_WIDTH / TABLE_HALF_HEIGHT;
+    let halfWidth: number;
+    let halfHeight: number;
+    if (aspect >= tableAspect) {
+      halfHeight = TABLE_HALF_HEIGHT;
+      halfWidth = halfHeight * aspect;
+    } else {
+      halfWidth = TABLE_HALF_WIDTH;
+      halfHeight = halfWidth / aspect;
+    }
+
     this.camera.left = -halfWidth;
     this.camera.right = halfWidth;
-    this.camera.top = halfHeight;
-    this.camera.bottom = -halfHeight;
+    this.camera.top = TABLE_CENTER_Y + halfHeight;
+    this.camera.bottom = TABLE_CENTER_Y - halfHeight;
+    this.camera.position.set(0, TABLE_CENTER_Y, 10);
+    this.camera.lookAt(0, TABLE_CENTER_Y, 0);
     this.camera.updateProjectionMatrix();
     this.render();
   }
