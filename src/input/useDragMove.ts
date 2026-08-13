@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { InputEngine } from './engine';
 import { exceedsThreshold, moveTarget } from './dragMove';
+import { targetValueAt } from './dom';
 
 interface DragState {
   dieId: string;
@@ -66,13 +67,4 @@ export function useDragMove(engine: InputEngine) {
     onPointerUp: up,
     onPointerCancel: cancel,
   };
-}
-
-function targetValueAt(x: number, y: number): number | undefined {
-  const el = document.elementFromPoint(x, y);
-  const group = el?.closest?.('.group');
-  const raw = group?.getAttribute('data-value');
-  if (raw === null || raw === undefined) return undefined;
-  const value = Number(raw);
-  return Number.isNaN(value) ? undefined : value;
 }

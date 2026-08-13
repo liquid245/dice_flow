@@ -4,6 +4,7 @@ import { groupByValue } from '../../core/groups/groups';
 import { useGame } from '../../app/game';
 import { useSwipeAdd } from '../../input/useSwipeAdd';
 import { useDragMove } from '../../input/useDragMove';
+import { useGroupSwipe } from '../../input/useGroupSwipe';
 import { TapCycleController, visualOrder } from '../../input/tapCycle';
 
 const GROUP_VALUES = [6, 5, 4, 3, 2, 1];
@@ -14,6 +15,7 @@ export function GameTable() {
   const cycleRef = useRef(new TapCycleController());
   const swipe = useSwipeAdd(engine, () => state.swipeAddAvailable && state.dice.length === 0);
   const drag = useDragMove(engine);
+  const groupSwipe = useGroupSwipe(engine);
 
   const selectedCount = state.dice.filter((d) => d.selected).length;
   useEffect(() => {
@@ -21,20 +23,18 @@ export function GameTable() {
   }, [selectedCount]);
 
   function mergeHandlers(
-    first: (event: ReactPointerEvent<HTMLDivElement>) => void,
-    second: (event: ReactPointerEvent<HTMLDivElement>) => void,
+    ...handlers: Array<(event: ReactPointerEvent<HTMLDivElement>) => void>
   ): (event: ReactPointerEvent<HTMLDivElement>) => void {
     return (event) => {
-      first(event);
-      second(event);
+      for (const handler of handlers) handler(event);
     };
   }
 
   const pointerHandlers = {
-    onPointerDown: mergeHandlers(swipe.onPointerDown, drag.onPointerDown),
-    onPointerMove: mergeHandlers(swipe.onPointerMove, drag.onPointerMove),
-    onPointerUp: mergeHandlers(swipe.onPointerUp, drag.onPointerUp),
-    onPointerCancel: mergeHandlers(swipe.onPointerCancel, drag.onPointerCancel),
+    onPointerDown: mergeHandlers(swipe.onPointerDown, drag.onPointerDown, groupSwipe.onPointerDown),
+    onPointerMove: mergeHandlers(swipe.onPointerMove, drag.onPointerMove, groupSwipe.onPointerMove),
+    onPointerUp: mergeHandlers(swipe.onPointerUp, drag.onPointerUp, groupSwipe.onPointerUp),
+    onPointerCancel: mergeHandlers(swipe.onPointerCancel, drag.onPointerCancel, groupSwipe.onPointerCancel),
   };
 
   if (state.dice.length === 0) {
