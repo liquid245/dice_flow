@@ -1,70 +1,61 @@
 import { describe, it, expect } from 'vitest';
 import type { Die } from '../core/dice/types';
-import {
-  groupY,
-  valueFromY,
-  layoutPositions,
-  MAX_PER_ROW,
-  TABLE_HALF_WIDTH,
-  TABLE_HALF_HEIGHT,
-  TABLE_CENTER_Y,
-} from './layout';
+import { layout } from './layout';
 
 function die(id: string, value: number): Die {
   return { id, type: 'd6', value, selected: false, origin: 'add' };
 }
 
-describe('groupY', () => {
-  it('places group 6 at the top', () => {
-    expect(groupY(6)).toBe(0);
+function diceOf(count: number, value: number): Die[] {
+  return Array.from({ length: count }, (_, i) => die(`d${i}`, value));
+}
+
+describe('layout', () => {
+  it('centers a single die', () => {
+    const { positions } = layout([die('a', 6)], 4);
+    expect(positions.get('a')).toEqual({ x: 0, y: -0.5, z: 0 });
   });
 
-  it('stacks group 1 below', () => {
-    expect(groupY(1)).toBe(-10);
-  });
-});
-
-describe('valueFromY', () => {
-  it('maps world Y back to a group value', () => {
-    expect(valueFromY(0)).toBe(6);
-    expect(valueFromY(-4)).toBe(4);
-    expect(valueFromY(-10)).toBe(1);
+  it('balances 7 dice into rows of 4 and 3', () => {
+    const { positions } = layout(diceOf(7, 6), 4);
+    const counts = new Map<number, number>();
+    for (const p of positions.values()) {
+      const key = Math.round(p.y * 10);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    expect([...counts.values()].sort()).toEqual([3, 4]);
   });
 
-  it('clamps out-of-range Y to 1..6', () => {
-    expect(valueFromY(50)).toBe(6);
-    expect(valueFromY(-50)).toBe(1);
-  });
-});
-
-describe('layoutPositions', () => {
-  it('centers a single group row', () => {
-    const positions = layoutPositions([die('a', 6), die('b', 6), die('c', 6)]);
-    expect(positions.get('a')).toEqual({ x: -1.3, y: 0, z: 0 });
-    expect(positions.get('b')).toEqual({ x: 0, y: 0, z: 0 });
-    expect(positions.get('c')).toEqual({ x: 1.3, y: 0, z: 0 });
+  it('balances 9 dice into three rows of 3', () => {
+    const { positions } = layout(diceOf(9, 6), 4);
+    const counts = new Map<number, number>();
+    for (const p of positions.values()) {
+      const key = Math.round(p.y * 10);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    expect([...counts.values()].sort()).toEqual([3, 3, 3]);
   });
 
-  it('separates groups vertically', () => {
-    const positions = layoutPositions([die('a', 6), die('b', 1)]);
-    expect(positions.get('a')?.y).toBe(0);
-    expect(positions.get('b')?.y).toBe(-10);
+  it('keeps a group on a single row when it fits', () => {
+    const { positions } = layout(diceOf(4, 6), 4);
+    expect(new Set([...positions.values()].map((p) => p.y)).size).toBe(1);
   });
 
-  it('wraps dice into additional rows', () => {
-    const dice = Array.from({ length: MAX_PER_ROW + 2 }, (_, i) => die(`d${i}`, 3));
-    const positions = layoutPositions(dice);
-    expect(positions.get(`d${MAX_PER_ROW}`)?.y).toBeLessThan(positions.get('d0')!.y);
-  });
-});
-
-describe('table extent', () => {
-  it('centers the table between groups 6 and 1', () => {
-    expect(TABLE_CENTER_Y).toBe(-5);
+  it('stacks group 6 above group 1', () => {
+    const { positions } = layout([die('a', 6), die('b', 1)], 4);
+    expect(positions.get('a')!.y).toBeGreaterThan(positions.get('b')!.y);
   });
 
-  it('covers the full group span with margin', () => {
-    expect(TABLE_HALF_HEIGHT).toBeGreaterThan(5);
-    expect(TABLE_HALF_WIDTH).toBeGreaterThan(4);
+  it('emits a band per group even when empty', () => {
+    const { bands, bounds } = layout([], 4);
+    expect(bands).toHaveLength(6);
+    expect(bounds.maxY).toBe(0);
+    expect(bounds.minY).toBeLessThan(0);
+  });
+
+  it('grows a group vertically when it wraps', () => {
+    const single = layout([die('a', 6)], 4);
+    const wrapped = layout(diceOf(9, 6), 4);
+    expect(wrapped.bounds.minY).toBeLessThan(single.bounds.minY);
   });
 });

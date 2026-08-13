@@ -1,8 +1,8 @@
 import type { DiceId, Die } from '../core/dice/types';
 
+export const DIE_SIZE = 1;
 export const DIE_SPACING = 1.3;
-export const GROUP_SPACING = 2.0;
-export const MAX_PER_ROW = 8;
+export const GROUP_GAP = 0.5;
 
 export interface DiePosition {
   x: number;
@@ -10,32 +10,75 @@ export interface DiePosition {
   z: number;
 }
 
-export function groupY(value: number): number {
-  return (value - 6) * GROUP_SPACING;
+export interface GroupBand {
+  value: number;
+  top: number;
+  bottom: number;
 }
 
-export const TABLE_HALF_WIDTH = ((MAX_PER_ROW - 1) * DIE_SPACING) / 2 + 1.2;
-export const TABLE_HALF_HEIGHT = (groupY(6) - groupY(1)) / 2 + 1.2;
-export const TABLE_CENTER_Y = (groupY(6) + groupY(1)) / 2;
-
-export function valueFromY(y: number): number {
-  const rowIndex = Math.round(-y / GROUP_SPACING);
-  return Math.max(1, Math.min(6, 6 - rowIndex));
+export interface Bounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
 }
 
-export function layoutPositions(dice: Die[]): Map<DiceId, DiePosition> {
+export interface Layout {
+  positions: Map<DiceId, DiePosition>;
+  bands: GroupBand[];
+  bounds: Bounds;
+}
+
+export function layout(dice: Die[], maxPerRow: number): Layout {
   const positions = new Map<DiceId, DiePosition>();
+  const bands: GroupBand[] = [];
+  let cursor = 0;
+
   for (let value = 6; value >= 1; value--) {
     const groupDice = dice.filter((d) => d.value === value);
+    const count = groupDice.length;
+    const rows = count === 0 ? 1 : Math.max(1, Math.ceil(count / maxPerRow));
+
+    const rowCounts = new Array<number>(rows).fill(0);
+    for (let i = 0; i < count; i++) {
+      rowCounts[Math.floor((i * rows) / count)]++;
+    }
+
+    const height = (rows - 1) * DIE_SPACING + DIE_SIZE;
+    bands.push({ value, top: cursor, bottom: cursor - height });
+
+    const rowIndex = new Array<number>(rows).fill(0);
     groupDice.forEach((die, i) => {
-      const row = Math.floor(i / MAX_PER_ROW);
-      const rowStart = row * MAX_PER_ROW;
-      const rowCount = Math.min(groupDice.length - rowStart, MAX_PER_ROW);
-      const col = i - rowStart;
-      const x = (col - (rowCount - 1) / 2) * DIE_SPACING;
-      const y = groupY(value) - row * DIE_SPACING;
+      const row = Math.floor((i * rows) / count);
+      const col = rowIndex[row]++;
+      const x = (col - (rowCounts[row] - 1) / 2) * DIE_SPACING;
+      const y = cursor - DIE_SIZE / 2 - row * DIE_SPACING;
       positions.set(die.id, { x, y, z: 0 });
     });
+
+    cursor -= height + GROUP_GAP;
   }
-  return positions;
+
+  return { positions, bands, bounds: computeBounds(positions, bands) };
+}
+
+function computeBounds(positions: Map<DiceId, DiePosition>, bands: GroupBand[]): Bounds {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (const position of positions.values()) {
+    minX = Math.min(minX, position.x - DIE_SIZE / 2);
+    maxX = Math.max(maxX, position.x + DIE_SIZE / 2);
+  }
+  if (minX === Infinity) {
+    minX = -2;
+    maxX = 2;
+  }
+
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const band of bands) {
+    minY = Math.min(minY, band.bottom);
+    maxY = Math.max(maxY, band.top);
+  }
+  return { minX, maxX, minY, maxY };
 }

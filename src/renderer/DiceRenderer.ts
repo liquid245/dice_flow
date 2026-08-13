@@ -2,19 +2,14 @@ import * as THREE from 'three';
 import type { GameState } from '../core/game/state';
 import type { DiceId } from '../core/dice/types';
 import { createD6Mesh, setD6Value } from './dice';
-import {
-  layoutPositions,
-  valueFromY,
-  groupY,
-  GROUP_SPACING,
-  TABLE_HALF_WIDTH,
-  TABLE_HALF_HEIGHT,
-  TABLE_CENTER_Y,
-} from './layout';
+import { layout, GROUP_GAP, type Layout } from './layout';
 import { computeTransitions, type DieSnapshot, type Transition } from './animator';
 import type { DieHit } from '../input/hitTest';
 
 const ANIMATION_DURATION_MS = 400;
+const CAMERA_PADDING = 1.0;
+const MIN_PER_ROW = 4;
+const MAX_PER_ROW = 10;
 
 type Tween =
   | { kind: 'appear'; mesh: THREE.Mesh }
@@ -39,6 +34,10 @@ export class DiceRenderer {
   private resizeObserver: ResizeObserver;
   private meshes = new Map<DiceId, THREE.Mesh>();
   private selected = new Set<THREE.Mesh>();
+  private plates = new Map<number, THREE.Mesh>();
+  private layout: Layout = { positions: new Map(), bands: [], bounds: { minX: -2, maxX: 2, minY: -1, maxY: 0 } };
+  private lastState: GameState | null = null;
+  private maxPerRow = 6;
   private prev: DieSnapshot[] = [];
   private tweens: Tween[] = [];
   private tweenMeshes = new Set<THREE.Mesh>();
@@ -66,15 +65,15 @@ export class DiceRenderer {
     key.position.set(5, 5, 10);
     this.scene.add(key);
 
-    this.createGroupPlates();
+    this.createPlates();
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
     this.resize();
   }
 
-  private createGroupPlates(): void {
-    const geometry = new THREE.PlaneGeometry(TABLE_HALF_WIDTH * 2, GROUP_SPACING * 0.85);
+  private createPlates(): void {
+    const geometry = new THREE.PlaneGeometry(1, 1);
     const material = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
@@ -83,8 +82,19 @@ export class DiceRenderer {
     });
     for (let value = 6; value >= 1; value--) {
       const plate = new THREE.Mesh(geometry, material);
-      plate.position.set(0, groupY(value), -0.5);
+      plate.position.z = -0.5;
+      this.plates.set(value, plate);
       this.scene.add(plate);
+    }
+  }
+
+  private updatePlates(): void {
+    const width = this.layout.bounds.maxX - this.layout.bounds.minX + 0.8;
+    for (const band of this.layout.bands) {
+      const plate = this.plates.get(band.value);
+      if (!plate) continue;
+      plate.scale.set(width, band.top - band.bottom, 1);
+      plate.position.set(0, (band.top + band.bottom) / 2, -0.5);
     }
   }
 
@@ -96,32 +106,62 @@ export class DiceRenderer {
     const width = this.container.clientWidth || 1;
     const height = this.container.clientHeight || 1;
     this.renderer.setSize(width, height, false);
+    this.maxPerRow = this.computeMaxPerRow(width / height);
+    this.relayout();
+    this.render();
+  }
 
+  private computeMaxPerRow(aspect: number): number {
+    return Math.max(MIN_PER_ROW, Math.min(MAX_PER_ROW, Math.round(6 * aspect)));
+  }
+
+  private relayout(): void {
+    const dice = this.lastState ? this.lastState.dice : [];
+    this.layout = layout(dice, this.maxPerRow);
+    for (const mesh of this.meshes.values()) {
+      const position = this.layout.positions.get(mesh.userData.dieId as string);
+      if (position) mesh.position.set(position.x, position.y, 0);
+    }
+    this.prev = this.lastState ? this.snapshots(this.lastState) : [];
+    this.updatePlates();
+    this.fitCamera();
+  }
+
+  private fitCamera(): void {
+    const bounds = this.layout.bounds;
+    const contentWidth = Math.max(bounds.maxX - bounds.minX, 1) + CAMERA_PADDING * 2;
+    const contentHeight = Math.max(bounds.maxY - bounds.minY, 1) + CAMERA_PADDING * 2;
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerY = (bounds.minY + bounds.maxY) / 2;
+
+    const width = this.container.clientWidth || 1;
+    const height = this.container.clientHeight || 1;
     const aspect = width / height;
-    const tableAspect = TABLE_HALF_WIDTH / TABLE_HALF_HEIGHT;
+
     let halfWidth: number;
     let halfHeight: number;
-    if (aspect >= tableAspect) {
-      halfHeight = TABLE_HALF_HEIGHT;
-      halfWidth = halfHeight * aspect;
-    } else {
-      halfWidth = TABLE_HALF_WIDTH;
+    if (contentWidth / contentHeight > aspect) {
+      halfWidth = contentWidth / 2;
       halfHeight = halfWidth / aspect;
+    } else {
+      halfHeight = contentHeight / 2;
+      halfWidth = halfHeight * aspect;
     }
 
-    this.camera.left = -halfWidth;
-    this.camera.right = halfWidth;
-    this.camera.top = halfHeight;
-    this.camera.bottom = -halfHeight;
-    this.camera.position.set(0, TABLE_CENTER_Y, 10);
-    this.camera.lookAt(0, TABLE_CENTER_Y, 0);
+    this.camera.left = centerX - halfWidth;
+    this.camera.right = centerX + halfWidth;
+    this.camera.top = centerY + halfHeight;
+    this.camera.bottom = centerY - halfHeight;
+    this.camera.position.set(centerX, centerY, 10);
+    this.camera.lookAt(centerX, centerY, 0);
     this.camera.updateProjectionMatrix();
-    this.render();
   }
 
   sync(state: GameState): void {
     this.finalizeAnimation();
     this.hasDice = state.dice.length > 0;
+    this.lastState = state;
+    this.layout = layout(state.dice, this.maxPerRow);
 
     const next = this.snapshots(state);
     const transitions = computeTransitions(this.prev, next);
@@ -139,15 +179,17 @@ export class DiceRenderer {
       }
     }
 
+    this.updatePlates();
+    this.fitCamera();
+
     if (transitions.length > 0) this.animate(transitions);
     if (this.selected.size > 0) this.ensureLoop();
     this.render();
   }
 
   private snapshots(state: GameState): DieSnapshot[] {
-    const positions = layoutPositions(state.dice);
     return state.dice.map((die) => {
-      const position = positions.get(die.id);
+      const position = this.layout.positions.get(die.id);
       return {
         id: die.id,
         value: die.value,
@@ -308,7 +350,10 @@ export class DiceRenderer {
     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
     const target = new THREE.Vector3();
     if (!this.raycaster.ray.intersectPlane(plane, target)) return undefined;
-    return valueFromY(target.y);
+    for (const band of this.layout.bands) {
+      if (target.y <= band.top && target.y >= band.bottom - GROUP_GAP) return band.value;
+    }
+    return undefined;
   }
 
   private ndc(clientX: number, clientY: number): THREE.Vector2 {
