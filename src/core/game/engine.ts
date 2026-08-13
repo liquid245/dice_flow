@@ -49,7 +49,7 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
     const previous = state;
     state = reduce(state, action, deps);
     const entry = makeEntry(action, previous, state, deps);
-    state = coalesce && !inTransaction ? mergeEntry(state, entry) : appendEntry(state, entry);
+    state = coalesce ? mergeEntry(state, entry) : appendEntry(state, entry);
 
     lastAction = action.type;
     notify();

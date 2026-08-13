@@ -14,5 +14,7 @@ export function useGame() {
     dispatch: engine.dispatch,
     canUndo: engine.canUndo,
     canRedo: engine.canRedo,
+    beginTransaction: engine.beginTransaction,
+    endTransaction: engine.endTransaction,
   };
 }

@@ -77,3 +77,12 @@ AI не должен самостоятельно расширять задач�
 - [x] Реализовать History: плоский лог всех действий (roll/reroll/add/delete/move/select/clear) + тесты
 - [x] Реализовать селекторы: groupByValue, selectedDice, counts + тесты
 - [x] Реализовать движок createEngine: dispatch, subscribe, canUndo/canRedo, beginTransaction/endTransaction + тесты
+- [x] Коалесцировать историю внутри транзакции (свайп = одна запись "add N") + тесты
+
+## Input Layer
+
+- [x] Реализовать SwipeAddSession: чистый контроллер жеста (add/delete с запоминанием значений) + тесты
+- [x] Реализовать хук useSwipeAdd и подключить свайп на пустом столе в GameTable
+- [ ] Реализовать tap-cycle выбора (одиночный → диапазон → сброс)
+- [ ] Реализовать drag для Move (перетаскивание выбранных в целевую группу)
+- [ ] Реализовать long press и group swipe

@@ -103,6 +103,22 @@ describe('engine', () => {
     expect(engine.canUndo()).toBe(false);
   });
 
+  it('coalesces consecutive adds within a transaction into one history entry', () => {
+    const engine = createEngine(makeDeps());
+    engine.beginTransaction();
+    engine.dispatch({ type: 'add', count: 1 });
+    engine.dispatch({ type: 'add', count: 1 });
+    engine.dispatch({ type: 'add', count: 1 });
+    engine.endTransaction();
+
+    expect(engine.getState().dice).toHaveLength(3);
+    expect(engine.getState().history).toHaveLength(1);
+    expect(engine.getState().history[0]).toMatchObject({ kind: 'add', count: 3 });
+
+    engine.dispatch({ type: 'undo' });
+    expect(engine.getState().dice).toHaveLength(0);
+  });
+
   it('undo restores history along with the dice', () => {
     const engine = createEngine(makeDeps());
     engine.dispatch({ type: 'add', count: 1 });
