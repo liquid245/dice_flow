@@ -1,9 +1,26 @@
 import * as THREE from 'three';
 import type { GameState } from '../core/game/state';
 import type { DiceId } from '../core/dice/types';
-import { createD6Mesh } from './dice';
+import { createD6Mesh, setD6Value } from './dice';
 import { layoutPositions, valueFromY } from './layout';
+import { computeTransitions, type DieSnapshot, type Transition } from './animator';
 import type { DieHit } from '../input/hitTest';
+
+const ANIMATION_DURATION_MS = 400;
+
+type Tween =
+  | { kind: 'appear'; mesh: THREE.Mesh }
+  | { kind: 'remove'; mesh: THREE.Mesh }
+  | {
+      kind: 'change';
+      mesh: THREE.Mesh;
+      fromX: number;
+      fromY: number;
+      toX: number;
+      toY: number;
+      toValue: number;
+      valueApplied: boolean;
+    };
 
 export class DiceRenderer {
   private renderer: THREE.WebGLRenderer;
@@ -12,6 +29,9 @@ export class DiceRenderer {
   private raycaster = new THREE.Raycaster();
   private resizeObserver: ResizeObserver;
   private meshes = new Map<DiceId, THREE.Mesh>();
+  private prev: DieSnapshot[] = [];
+  private tweens: Tween[] = [];
+  private rafId: number | null = null;
   private hasDice = false;
 
   constructor(private container: HTMLElement) {
@@ -58,31 +78,48 @@ export class DiceRenderer {
   }
 
   sync(state: GameState): void {
+    this.finalizeAnimation();
     this.hasDice = state.dice.length > 0;
-    const positions = layoutPositions(state.dice);
-    const seen = new Set<DiceId>();
+
+    const next = this.snapshots(state);
+    const transitions = computeTransitions(this.prev, next);
+    this.prev = next;
 
     for (const die of state.dice) {
-      seen.add(die.id);
-      let mesh = this.meshes.get(die.id);
-      if (!mesh) {
-        mesh = createD6Mesh();
-        mesh.userData.dieId = die.id;
-        this.meshes.set(die.id, mesh);
-        this.scene.add(mesh);
-      }
-      mesh.userData.value = die.value;
-      const position = positions.get(die.id);
-      if (position) mesh.position.set(position.x, position.y, position.z);
+      const mesh = this.ensureMesh(die.id, die.value);
       this.applySelection(mesh, die.selected);
     }
 
-    for (const [id, mesh] of this.meshes) {
-      if (!seen.has(id)) {
-        this.scene.remove(mesh);
-        this.meshes.delete(id);
-      }
+    if (transitions.length > 0) {
+      this.animate(transitions);
+    } else {
+      this.render();
     }
+  }
+
+  private snapshots(state: GameState): DieSnapshot[] {
+    const positions = layoutPositions(state.dice);
+    return state.dice.map((die) => {
+      const position = positions.get(die.id);
+      return {
+        id: die.id,
+        value: die.value,
+        x: position?.x ?? 0,
+        y: position?.y ?? 0,
+      };
+    });
+  }
+
+  private ensureMesh(id: DiceId, value: number): THREE.Mesh {
+    let mesh = this.meshes.get(id);
+    if (!mesh) {
+      mesh = createD6Mesh(value);
+      mesh.userData.dieId = id;
+      mesh.userData.value = value;
+      this.meshes.set(id, mesh);
+      this.scene.add(mesh);
+    }
+    return mesh;
   }
 
   private applySelection(mesh: THREE.Mesh, selected: boolean): void {
@@ -91,6 +128,91 @@ export class DiceRenderer {
       material.emissive.setHex(selected ? 0x661111 : 0x000000);
     }
     mesh.scale.setScalar(selected ? 1.12 : 1);
+  }
+
+  private animate(transitions: Transition[]): void {
+    const tweens: Tween[] = [];
+    for (const transition of transitions) {
+      if (transition.kind === 'appear') {
+        const mesh = this.ensureMesh(transition.id, transition.value);
+        mesh.position.set(transition.x, transition.y, 0);
+        mesh.scale.setScalar(0);
+        tweens.push({ kind: 'appear', mesh });
+      } else if (transition.kind === 'remove') {
+        const mesh = this.meshes.get(transition.id);
+        if (mesh) tweens.push({ kind: 'remove', mesh });
+      } else {
+        const mesh = this.ensureMesh(transition.id, transition.fromValue);
+        setD6Value(mesh, transition.fromValue);
+        mesh.position.set(transition.fromX, transition.fromY, 0);
+        tweens.push({
+          kind: 'change',
+          mesh,
+          fromX: transition.fromX,
+          fromY: transition.fromY,
+          toX: transition.toX,
+          toY: transition.toY,
+          toValue: transition.toValue,
+          valueApplied: false,
+        });
+      }
+    }
+
+    this.tweens = tweens;
+    const start = performance.now();
+
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / ANIMATION_DURATION_MS);
+      const e = 1 - Math.pow(1 - t, 3);
+
+      for (const tween of this.tweens) {
+        if (tween.kind === 'appear') {
+          tween.mesh.scale.setScalar(e);
+        } else if (tween.kind === 'remove') {
+          tween.mesh.scale.setScalar(1 - e);
+        } else {
+          tween.mesh.position.x = tween.fromX + (tween.toX - tween.fromX) * e;
+          tween.mesh.position.y = tween.fromY + (tween.toY - tween.fromY) * e;
+          tween.mesh.rotation.x = e * Math.PI * 2;
+          tween.mesh.rotation.y = e * Math.PI * 2;
+          if (!tween.valueApplied && t >= 0.5) {
+            setD6Value(tween.mesh, tween.toValue);
+            tween.valueApplied = true;
+          }
+        }
+      }
+
+      this.render();
+
+      if (t < 1) {
+        this.rafId = requestAnimationFrame(step);
+      } else {
+        this.finalizeAnimation();
+      }
+    };
+
+    this.rafId = requestAnimationFrame(step);
+  }
+
+  private finalizeAnimation(): void {
+    for (const tween of this.tweens) {
+      if (tween.kind === 'appear') {
+        tween.mesh.scale.setScalar(1);
+      } else if (tween.kind === 'remove') {
+        this.scene.remove(tween.mesh);
+        this.meshes.delete(tween.mesh.userData.dieId as string);
+      } else {
+        tween.mesh.position.set(tween.toX, tween.toY, 0);
+        tween.mesh.rotation.set(0, 0, 0);
+        setD6Value(tween.mesh, tween.toValue);
+        tween.mesh.userData.value = tween.toValue;
+      }
+    }
+    this.tweens = [];
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
   }
 
   render(): void {
@@ -124,6 +246,7 @@ export class DiceRenderer {
   }
 
   dispose(): void {
+    this.finalizeAnimation();
     this.resizeObserver.disconnect();
     this.renderer.dispose();
     this.renderer.domElement.remove();

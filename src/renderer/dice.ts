@@ -1,6 +1,5 @@
 import * as THREE from 'three';
-
-const FACE_VALUES = [3, 4, 2, 5, 1, 6];
+import { faceArrangement } from './faces';
 
 const PIPS: Record<number, Array<[number, number]>> = {
   1: [[0, 0]],
@@ -62,10 +61,33 @@ function pipTexture(value: number): THREE.CanvasTexture {
   return texture;
 }
 
-export function createD6Mesh(): THREE.Mesh {
+let sharedTextures: Map<number, THREE.CanvasTexture> | null = null;
+
+export function getPipTextures(): Map<number, THREE.CanvasTexture> {
+  if (!sharedTextures) {
+    sharedTextures = new Map<number, THREE.CanvasTexture>();
+    for (let value = 1; value <= 6; value++) {
+      sharedTextures.set(value, pipTexture(value));
+    }
+  }
+  return sharedTextures;
+}
+
+export function createD6Mesh(value: number): THREE.Mesh {
+  const textures = getPipTextures();
   const geometry = new THREE.BoxGeometry(1, 1, 1);
-  const materials = FACE_VALUES.map(
-    (value) => new THREE.MeshStandardMaterial({ map: pipTexture(value), roughness: 0.6, metalness: 0.05 }),
+  const materials = faceArrangement(value).map(
+    (faceValue) =>
+      new THREE.MeshStandardMaterial({ map: textures.get(faceValue), roughness: 0.6, metalness: 0.05 }),
   );
   return new THREE.Mesh(geometry, materials);
+}
+
+export function setD6Value(mesh: THREE.Mesh, value: number): void {
+  const textures = getPipTextures();
+  const materials = mesh.material as THREE.MeshStandardMaterial[];
+  faceArrangement(value).forEach((faceValue, index) => {
+    materials[index].map = textures.get(faceValue) ?? null;
+    materials[index].needsUpdate = true;
+  });
 }
