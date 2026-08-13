@@ -21,7 +21,7 @@ describe('engine', () => {
     expect(notified).toBe(1);
   });
 
-  it('records every action in history', () => {
+  it('records every action in history except selection', () => {
     const engine = createEngine(makeDeps());
     engine.dispatch({ type: 'add', count: 3 });
     engine.dispatch({ type: 'select', ids: ['d1'], mode: 'set' });
@@ -32,9 +32,9 @@ describe('engine', () => {
     engine.dispatch({ type: 'clear' });
 
     const history = engine.getState().history;
-    expect(history.map((e) => e.kind)).toEqual(['add', 'select', 'move', 'select', 'roll', 'delete', 'clear']);
+    expect(history.map((e) => e.kind)).toEqual(['add', 'move', 'roll', 'delete', 'clear']);
     expect(history[0].count).toBe(3);
-    expect(history[2]).toMatchObject({ kind: 'move', count: 1, value: 5 });
+    expect(history[1]).toMatchObject({ kind: 'move', count: 1, value: 5 });
   });
 
   it('records the reroll value when the selected dice are uniform', () => {
@@ -46,22 +46,31 @@ describe('engine', () => {
     expect(last).toMatchObject({ kind: 'reroll', count: 2, value: 6 });
   });
 
-  it('undoes and redoes every action, including select', () => {
+  it('undoes and redoes every action, excluding selection', () => {
     const engine = createEngine(makeDeps());
     engine.dispatch({ type: 'add', count: 2 });
     engine.dispatch({ type: 'select', ids: ['d1'], mode: 'set' });
     expect(engine.getState().dice.filter((d) => d.selected)).toHaveLength(1);
 
     engine.dispatch({ type: 'undo' });
-    expect(engine.getState().dice.filter((d) => d.selected)).toHaveLength(0);
-    expect(engine.getState().dice).toHaveLength(2);
-    engine.dispatch({ type: 'undo' });
     expect(engine.getState().dice).toHaveLength(0);
+    expect(engine.canUndo()).toBe(false);
 
     engine.dispatch({ type: 'redo' });
     expect(engine.getState().dice).toHaveLength(2);
-    engine.dispatch({ type: 'redo' });
+  });
+
+  it('selection is not undoable and not recorded', () => {
+    const engine = createEngine(makeDeps());
+    engine.dispatch({ type: 'add', count: 2 });
+    engine.dispatch({ type: 'select', ids: ['d1'], mode: 'set' });
+
     expect(engine.getState().dice.filter((d) => d.selected)).toHaveLength(1);
+    expect(engine.getState().history.map((e) => e.kind)).toEqual(['add']);
+
+    engine.dispatch({ type: 'undo' });
+    expect(engine.getState().dice).toHaveLength(0);
+    expect(engine.canUndo()).toBe(false);
   });
 
   it('coalesces consecutive adds into a single action', () => {

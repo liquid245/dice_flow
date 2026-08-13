@@ -32,6 +32,13 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
   }
 
   function dispatchGame(action: GameAction): void {
+    if (action.type === 'select') {
+      state = reduce(state, action, deps);
+      lastAction = null;
+      notify();
+      return;
+    }
+
     const coalesce =
       (action.type === 'add' && lastAction === 'add') ||
       (action.type === 'delete' && lastAction === 'delete');

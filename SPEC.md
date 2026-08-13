@@ -160,7 +160,7 @@ Undo and Redo operate on gameplay state.
 
 They have unlimited depth within the session.
 
-Undo and Redo navigate the action history: every action, including selection and Clear, can be undone.
+Undo and Redo navigate the action history: every action except selection can be undone.
 
 After a new action is performed following Undo, the abandoned Redo branch is removed.
 
@@ -168,7 +168,7 @@ Consecutive identical actions coalesce into a single undoable step. For example,
 
 ## History
 
-History records every action the player performs: Roll, ReRoll, Add, Delete, Move, Select and Clear.
+History records every action the player performs: Roll, ReRoll, Add, Delete, Move and Clear.
 
 Undo and Redo navigate this same history and are not recorded as separate entries.
 
