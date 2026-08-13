@@ -5,6 +5,8 @@ import { createD6Mesh, setD6Value } from './dice';
 import {
   layoutPositions,
   valueFromY,
+  groupY,
+  GROUP_SPACING,
   TABLE_HALF_WIDTH,
   TABLE_HALF_HEIGHT,
   TABLE_CENTER_Y,
@@ -64,9 +66,26 @@ export class DiceRenderer {
     key.position.set(5, 5, 10);
     this.scene.add(key);
 
+    this.createGroupPlates();
+
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
     this.resize();
+  }
+
+  private createGroupPlates(): void {
+    const geometry = new THREE.PlaneGeometry(TABLE_HALF_WIDTH * 2, GROUP_SPACING * 0.85);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.08,
+      depthWrite: false,
+    });
+    for (let value = 6; value >= 1; value--) {
+      const plate = new THREE.Mesh(geometry, material);
+      plate.position.set(0, groupY(value), -0.5);
+      this.scene.add(plate);
+    }
   }
 
   get domElement(): HTMLCanvasElement {
