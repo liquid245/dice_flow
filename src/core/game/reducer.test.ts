@@ -49,6 +49,16 @@ describe('add', () => {
     const state = reduce(createInitialState(), { type: 'add', count: 2, values: [5] }, makeDeps([rand(4)]));
     expect(state.dice.map((d) => d.value)).toEqual([5, 4]);
   });
+
+  it('clears the existing selection', () => {
+    const state = stateWith([die('a', 1, true), die('b', 2)]);
+    const next = reduce(state, { type: 'add', count: 1, values: [3] }, makeDeps([]));
+    expect(next.dice.map((d) => [d.id, d.selected])).toEqual([
+      ['a', false],
+      ['b', false],
+      ['d1', false],
+    ]);
+  });
 });
 
 describe('delete', () => {

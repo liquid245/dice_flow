@@ -39,7 +39,11 @@ function addDice(state: GameState, count: number, values: number[] | undefined, 
       origin: 'add',
     });
   }
-  return { ...state, dice: [...state.dice, ...added], swipeAddAvailable: false };
+  return {
+    ...state,
+    dice: [...state.dice.map((d) => (d.selected ? { ...d, selected: false } : d)), ...added],
+    swipeAddAvailable: false,
+  };
 }
 
 function deleteDice(state: GameState, count: number | undefined): GameState {
