@@ -46,7 +46,22 @@ export function RendererCanvas() {
   };
 
   const swipe = useSwipeAdd(engine, () => state.swipeAddAvailable && state.dice.length === 0);
-  const drag = useDragMove(engine, hitTest, (id) => dispatch(cycleRef.current.tap(order, id)));
+  const selectedIds = new Set(state.dice.filter((d) => d.selected).map((d) => d.id));
+  const drag = useDragMove(
+    engine,
+    hitTest,
+    (id) => dispatch(cycleRef.current.tap(order, id, selectedIds)),
+    (fromId, toId) => dispatch(cycleRef.current.swipe(order, fromId, toId)),
+    (fromId, toId) => {
+      if (toId) {
+        dispatch(cycleRef.current.swipe(order, fromId, toId));
+      } else {
+        cycleRef.current.reset();
+        dispatch({ type: 'select', ids: [fromId], mode: 'set' });
+      }
+    },
+    (drag) => rendererRef.current?.setDrag(drag),
+  );
   const groupSwipe = useGroupSwipe(engine, hitTest);
 
   function mergeHandlers(

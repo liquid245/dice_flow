@@ -3,8 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import { rollD6 } from '../core/dice/roll';
 import { SwipeAddSession } from './swipeAdd';
 import type { InputEngine } from './engine';
-
-const PIXELS_PER_DIE = 28;
+import { config } from '../config';
 
 interface Gesture {
   session: SwipeAddSession;
@@ -30,7 +29,7 @@ export function useSwipeAdd(engine: InputEngine, enabled: () => boolean) {
   function move(event: ReactPointerEvent<HTMLDivElement>) {
     const g = gesture.current;
     if (!g || !g.active) return;
-    const target = Math.round((event.clientX - g.startX) / PIXELS_PER_DIE);
+    const target = Math.round((event.clientX - g.startX) / config.input.pixelsPerDie);
     for (const action of g.session.setCount(target)) {
       engine.dispatch(action);
     }

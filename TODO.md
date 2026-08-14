@@ -63,7 +63,7 @@ AI не должен самостоятельно расширять задач�
 ## Движок (Core)
 
 - [x] Определить типы кубика (src/core/dice/types.ts): DiceId = string; DiceType = 'd6'; OperationKind = 'roll' | 'reroll' | 'add' | 'move'; Die { id, type, value, selected, origin }
-- [x] Определить GameState (src/core/game/state.ts): { dice: Die[]; history: HistoryEntry[]; swipeAddAvailable: boolean }
+- [x] Определить GameState (src/core/game/state.ts): { dice: Die[]; history: HistoryEntry[]; swipeAddAvailable: boolean; rememberedValues: number[] }
 - [x] Определить EngineDeps { random, nextId, now } и Action union (src/core/actions/types.ts): roll | reroll | add{count, values?} | delete{count?} | move{targetValue} | select{ids, mode} | clear | undo | redo
 - [x] Реализовать чистую функцию reduce(state, action, deps) (src/core/game/reducer.ts)
 - [x] Реализовать add: случайные значения (+N), опциональные явные значения для восстановления при свайпе + тесты
@@ -73,8 +73,10 @@ AI не должен самостоятельно расширять задач�
 - [x] Реализовать move: перемещение выбранных в целевую группу + тесты
 - [x] Реализовать select: set/toggle/add/remove + тесты
 - [x] Реализовать clear: очистка стола + swipeAddAvailable = true + тесты
-- [x] Реализовать undo/redo: навигация по истории действий (все действия отменяемы), коалесцирование одинаковых действий + тесты
-- [x] Реализовать History: плоский лог всех действий (roll/reroll/add/delete/move/select/clear) + тесты
+- [x] Реализовать undo/redo: навигация по истории действий (все действия отменяемы, кроме выбора), коалесцирование одинаковых действий + тесты
+- [x] Реализовать History: плоский лог всех действий (roll/reroll/add/delete/move/clear; выбор не логируется) + тесты
+- [x] Реализовать память значений удалённых кубиков (LIFO) + сброс по roll/reroll/clear + тесты
+- [x] Сворачивать последовательность Add/Delete в одну net-запись истории + тесты
 - [x] Реализовать селекторы: groupByValue, selectedDice, counts + тесты
 - [x] Реализовать движок createEngine: dispatch, subscribe, canUndo/canRedo, beginTransaction/endTransaction + тесты
 - [x] Коалесцировать историю внутри транзакции (свайп = одна запись "add N") + тесты
@@ -84,18 +86,30 @@ AI не должен самостоятельно расширять задач�
 - [x] Реализовать SwipeAddSession: чистый контроллер жеста (add/delete с запоминанием значений) + тесты
 - [x] Реализовать хук useSwipeAdd и подключить свайп на пустом столе в GameTable
 - [x] Реализовать tap-cycle выбора (одиночный → диапазон → сброс) + тесты
+- [x] Тап по уже выбранному кубику снимает выделение + тесты
+- [x] Реализовать свайп с кубика на кубик: живой выбор диапазона (обновляется по мере движения пальца, drag после начала свайпа не включается) + тесты
 - [x] Реализовать drag для Move (перетаскивание выбранных в целевую группу) + тесты
-- [x] Реализовать group swipe (выбор диапазона групп) + тесты
-- [ ] Long press: уточнить поведение (SPEC привязывает long press к move, уже покрыто drag)
+- [x] Визуальный захват при drag: кубик(и) увеличиваются и следуют за курсором
+- [x] Задержка перед drag: удержание input.dragDelayMs (1000 мс) активирует перетаскивание (DieGestureController: tap/swipe/drag) + тесты
+- [x] Реализовать group swipe (живой выбор диапазона групп) + тесты
 
 ## Renderer
 
 - [x] Реализовать 3D-сцену: D6-меш, свет, ортокамера, событийный рендер + raycast-picking
 - [x] Реализовать чистый layout кубиков по группам + тесты
 - [x] Реализовать анимации (появление/удаление/изменение) без постоянного render loop
+- [x] Панели групп: скруглённые углы, вертикальный отступ, ярче при полном выделении (настройки в config.renderer.plate)
 
 ## Storage
 
 - [x] Реализовать IndexedDB-хранилище (db + Storage: saveGame/loadGame)
 - [x] Реализовать initPersistence: восстановление при старте + debounced-сохранение + тесты
 - [x] Добавить engine.restore и подключить persistence в main.tsx
+
+## UI
+
+- [x] Объединить Info Panel и History в одну верхнюю строку «Всего → изменения → Выделено»
+
+## Конфигурация
+
+- [x] Вынести настраиваемые константы (renderer/layout/input/storage) в src/config.ts

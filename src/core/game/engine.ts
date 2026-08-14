@@ -24,6 +24,7 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
   let lastAction: string | null = null;
   let inTransaction = false;
   let transactionPushed = false;
+  let transactionDirty = false;
 
   function notify(): void {
     for (const listener of listeners) {
@@ -39,9 +40,8 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
       return;
     }
 
-    const coalesce =
-      (action.type === 'add' && lastAction === 'add') ||
-      (action.type === 'delete' && lastAction === 'delete');
+    const isMod = action.type === 'add' || action.type === 'delete';
+    const coalesce = isMod && (lastAction === 'add' || lastAction === 'delete');
 
     if (inTransaction) {
       if (!transactionPushed) {
@@ -49,6 +49,7 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
         redoStack = [];
         transactionPushed = true;
       }
+      if (isMod) transactionDirty = true;
     } else if (!coalesce) {
       undoStack.push(state);
       redoStack = [];
@@ -57,7 +58,7 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
     const previous = state;
     state = reduce(state, action, deps);
     const entry = makeEntry(action, previous, state, deps);
-    state = coalesce ? mergeEntry(state, entry) : appendEntry(state, entry);
+    state = isMod ? mergeModEntry(state, entry) : appendEntry(state, entry);
 
     lastAction = action.type;
     notify();
@@ -99,15 +100,20 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
     beginTransaction() {
       inTransaction = true;
       transactionPushed = false;
+      transactionDirty = false;
       lastAction = null;
     },
     endTransaction() {
       inTransaction = false;
       transactionPushed = false;
+      if (transactionDirty) {
+        state = { ...state, rememberedValues: [] };
+      }
+      transactionDirty = false;
       lastAction = null;
     },
     restore(restored: GameState) {
-      state = restored;
+      state = { ...createInitialState(), ...restored };
       undoStack.length = 0;
       redoStack = [];
       lastAction = null;
@@ -157,9 +163,18 @@ function appendEntry(state: GameState, entry: HistoryEntry): GameState {
   return { ...state, history: [...state.history, entry] };
 }
 
-function mergeEntry(state: GameState, entry: HistoryEntry): GameState {
-  if (state.history.length === 0) return appendEntry(state, entry);
-  const last = state.history[state.history.length - 1];
-  const merged: HistoryEntry = { ...last, count: last.count + entry.count };
-  return { ...state, history: [...state.history.slice(0, -1), merged] };
+function mergeModEntry(state: GameState, entry: HistoryEntry): GameState {
+  const history = state.history;
+  const last = history[history.length - 1];
+  if (!last || (last.kind !== 'add' && last.kind !== 'delete')) {
+    return appendEntry(state, entry);
+  }
+  const lastNet = last.kind === 'add' ? last.count : -last.count;
+  const entryNet = entry.kind === 'add' ? entry.count : -entry.count;
+  const net = lastNet + entryNet;
+  if (net === 0) {
+    return { ...state, history: history.slice(0, -1) };
+  }
+  const merged: HistoryEntry = { ...last, kind: net > 0 ? 'add' : 'delete', count: Math.abs(net) };
+  return { ...state, history: [...history.slice(0, -1), merged] };
 }

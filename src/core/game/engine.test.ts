@@ -137,12 +137,48 @@ describe('engine', () => {
     expect(engine.getState().history).toHaveLength(0);
   });
 
+  it('nets add and delete into a single entry', () => {
+    const engine = createEngine(makeDeps());
+    engine.dispatch({ type: 'add', count: 5 });
+    engine.dispatch({ type: 'delete', count: 2 });
+    engine.dispatch({ type: 'add', count: 1 });
+    expect(engine.getState().dice).toHaveLength(4);
+    expect(engine.getState().history).toHaveLength(1);
+    expect(engine.getState().history[0]).toMatchObject({ kind: 'add', count: 4 });
+  });
+
+  it('nets a modification past zero into a delete entry', () => {
+    const engine = createEngine(makeDeps());
+    engine.dispatch({ type: 'add', count: 3 });
+    engine.dispatch({ type: 'select', ids: ['d1'], mode: 'set' });
+    engine.dispatch({ type: 'move', targetValue: 5 });
+    engine.dispatch({ type: 'delete', count: 2 });
+    engine.dispatch({ type: 'add', count: 1 });
+    expect(engine.getState().history.map((e) => [e.kind, e.count])).toEqual([
+      ['add', 3],
+      ['move', 1],
+      ['delete', 1],
+    ]);
+  });
+
+  it('undoes a whole netted modification as one step', () => {
+    const engine = createEngine(makeDeps());
+    engine.dispatch({ type: 'add', count: 5 });
+    engine.dispatch({ type: 'delete', count: 2 });
+    engine.dispatch({ type: 'add', count: 1 });
+    expect(engine.getState().dice).toHaveLength(4);
+
+    engine.dispatch({ type: 'undo' });
+    expect(engine.getState().dice).toHaveLength(0);
+    expect(engine.canUndo()).toBe(false);
+  });
+
   it('restore replaces state and clears undo history', () => {
     const engine = createEngine(makeDeps());
     engine.dispatch({ type: 'add', count: 2 });
     expect(engine.canUndo()).toBe(true);
 
-    engine.restore({ dice: [], history: [], swipeAddAvailable: false });
+    engine.restore({ dice: [], history: [], swipeAddAvailable: false, rememberedValues: [] });
     expect(engine.getState().dice).toHaveLength(0);
     expect(engine.getState().swipeAddAvailable).toBe(false);
     expect(engine.canUndo()).toBe(false);

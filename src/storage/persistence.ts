@@ -1,7 +1,6 @@
 import type { GameState } from '../core/game/state';
 import type { GameStorage } from './storage';
-
-const SAVE_DEBOUNCE_MS = 500;
+import { config } from '../config';
 
 export interface PersistableEngine {
   getState(): GameState;
@@ -26,7 +25,7 @@ export function initPersistence(engine: PersistableEngine, storage: GameStorage)
 
   const unsubscribe = engine.subscribe(() => {
     if (timer !== undefined) clearTimeout(timer);
-    timer = setTimeout(flush, SAVE_DEBOUNCE_MS);
+    timer = setTimeout(flush, config.storage.saveDebounceMs);
   });
 
   const onVisibilityChange = () => {

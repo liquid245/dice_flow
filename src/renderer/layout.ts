@@ -1,8 +1,9 @@
 import type { DiceId, Die } from '../core/dice/types';
+import { config } from '../config';
 
-export const DIE_SIZE = 1;
-export const DIE_SPACING = 1.3;
-export const GROUP_GAP = 0.5;
+const DIE_SIZE = config.layout.dieSize;
+const DIE_SPACING = config.layout.dieSpacing;
+const GROUP_GAP = config.layout.groupGap;
 
 export interface DiePosition {
   x: number;

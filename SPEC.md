@@ -70,11 +70,18 @@ Selection is performed through touch interaction.
 
 Tap behaviour:
 
-- first tap selects one die;
-- second tap selects the range from the first to the last die, inclusive;
-- third tap clears the selection.
+- a tap on a non-selected die selects it;
+- a tap on another non-selected die selects the inclusive range from the first to the last die;
+- a tap on an already-selected die clears the selection;
+- a tap on a non-selected die while a range is selected clears the selection.
 
-Long press and drag can be used to move dice between groups.
+Swipe: press a die and swipe toward other dice before the drag delay elapses. The range from the start die to the die currently under the finger is selected live, updating in real time. Once a swipe begins, drag does not engage.
+
+Group swipe: swiping across groups selects the range of groups live, from the start group to the group currently under the finger.
+
+Hold: press and hold a die for about one second (without moving past the threshold), then drag to move dice between groups.
+
+While a die is being dragged, it grows and follows the cursor; when several dice are moved, they gather around the cursor and follow it as a group.
 
 The exact gesture implementation may evolve during development.
 
@@ -108,9 +115,11 @@ If nothing is selected:
 
 `Add 1`
 
+Deleted values are remembered: a die added without an explicit value reuses the value of the last deleted die, so delete-then-add leaves values unchanged. This memory is cleared by Roll, ReRoll and Clear.
+
 During the empty-table swipe, assigned values are remembered: if dice are removed and then re-added within the same gesture, they return with the same values.
 
-Consecutive Add presses are treated as one action. For example, pressing "Add 1" five times is a single action that adds five dice.
+Consecutive Add and Delete presses within one round coalesce into a single net action. For example, pressing "Add 5", then "Delete 2", then "Add 1" is recorded as a single "Add 4" action.
 
 ### Delete
 
@@ -119,6 +128,8 @@ Deletes selected dice.
 The button displays the number of selected dice when applicable.
 
 If no dice are selected, Delete may remove the most recently added player-created die.
+
+Deleted dice values are remembered so a subsequent Add returns the same value (see Add).
 
 ### Move
 
@@ -164,13 +175,15 @@ Undo and Redo navigate the action history: every action except selection can be 
 
 After a new action is performed following Undo, the abandoned Redo branch is removed.
 
-Consecutive identical actions coalesce into a single undoable step. For example, pressing "Add 1" five times in a row is one action that adds five dice; an empty-table swipe is one action whose number of dice is fixed when the finger is released.
+Consecutive identical actions coalesce into a single undoable step. For example, pressing "Add 1" five times in a row is one action that adds five dice; an empty-table swipe is one action whose number of dice is fixed when the finger is released. A mixed Add/Delete sequence within one round also coalesces into a single net action: "Add 5, Delete 2, Add 1" is one "Add 4" step.
 
 ## History
 
 History records every action the player performs: Roll, ReRoll, Add, Delete, Move and Clear.
 
 Undo and Redo navigate this same history and are not recorded as separate entries.
+
+Add and Delete within the same round are collapsed into a single net entry: "Add 5, Delete 2, Add 1" is recorded as "Add 4".
 
 Example:
 
@@ -194,11 +207,18 @@ Groups of rolls are separated by timestamps.
 
 The upper area of the interface is an information panel.
 
+The top row displays three segments in order:
+
+- total dice on the table;
+- changes since the last Roll or Clear;
+- selected dice count.
+
+The changes segment shows only the actions performed since the most recent Roll or Clear. After a Roll or Clear it is empty until the next modification.
+
 It does not have to permanently display History.
 
-Possible content includes:
+Possible future content includes:
 
-- recent history;
 - current dice statistics;
 - current results;
 - quotes;

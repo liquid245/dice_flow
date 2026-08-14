@@ -5,8 +5,9 @@ export interface GameState {
   dice: Die[];
   history: HistoryEntry[];
   swipeAddAvailable: boolean;
+  rememberedValues: number[];
 }
 
 export function createInitialState(): GameState {
-  return { dice: [], history: [], swipeAddAvailable: true };
+  return { dice: [], history: [], swipeAddAvailable: true, rememberedValues: [] };
 }

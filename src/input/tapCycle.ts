@@ -17,7 +17,12 @@ export class TapCycleController {
   private phase: TapPhase = 'idle';
   private anchorId: DiceId | null = null;
 
-  tap(order: DiceId[], tappedId: DiceId): GameAction {
+  tap(order: DiceId[], tappedId: DiceId, selected: ReadonlySet<DiceId>): GameAction {
+    if (selected.has(tappedId)) {
+      this.reset();
+      return { type: 'select', ids: [], mode: 'set' };
+    }
+
     if (this.phase === 'idle') {
       this.phase = 'single';
       this.anchorId = tappedId;
@@ -36,6 +41,12 @@ export class TapCycleController {
     this.phase = 'idle';
     this.anchorId = null;
     return { type: 'select', ids: [], mode: 'set' };
+  }
+
+  swipe(order: DiceId[], fromId: DiceId, toId: DiceId): GameAction {
+    this.phase = 'range';
+    this.anchorId = fromId;
+    return { type: 'select', ids: sliceRange(order, fromId, toId), mode: 'set' };
   }
 
   reset(): void {

@@ -1,13 +1,12 @@
 import type { GameAction } from '../core/actions/types';
-
-export const DRAG_THRESHOLD_PX = 8;
+import { config } from '../config';
 
 export function exceedsThreshold(
   x0: number,
   y0: number,
   x1: number,
   y1: number,
-  threshold: number = DRAG_THRESHOLD_PX,
+  threshold: number = config.input.dragThresholdPx,
 ): boolean {
   const dx = x1 - x0;
   const dy = y1 - y0;

@@ -36,6 +36,9 @@ export function useGroupSwipe(engine: InputEngine, hitTest: HitTest) {
       s.dragging = true;
       event.currentTarget.setPointerCapture(event.pointerId);
     }
+    const endValue = hitTest.groupAt(event.clientX, event.clientY);
+    if (endValue === undefined) return;
+    engine.dispatch(selectRangeGroups(engine.getState().dice, s.startValue, endValue));
   }
 
   function up(event: ReactPointerEvent<HTMLDivElement>) {

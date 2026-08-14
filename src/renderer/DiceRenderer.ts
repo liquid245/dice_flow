@@ -2,14 +2,10 @@ import * as THREE from 'three';
 import type { GameState } from '../core/game/state';
 import type { DiceId } from '../core/dice/types';
 import { createD6Mesh, setD6Value } from './dice';
-import { layout, GROUP_GAP, type Layout } from './layout';
+import { layout, type Layout } from './layout';
 import { computeTransitions, type DieSnapshot, type Transition } from './animator';
 import type { DieHit } from '../input/hitTest';
-
-const ANIMATION_DURATION_MS = 400;
-const CAMERA_PADDING = 1.0;
-const MIN_PER_ROW = 4;
-const MAX_PER_ROW = 10;
+import { config } from '../config';
 
 type Tween =
   | { kind: 'appear'; mesh: THREE.Mesh }
@@ -44,6 +40,10 @@ export class DiceRenderer {
   private tweenStart = 0;
   private rafId: number | null = null;
   private hasDice = false;
+  private dragId: DiceId | null = null;
+  private dragOffsets = new Map<DiceId, { x: number; y: number }>();
+  private dragCursor: { x: number; y: number } | null = null;
+  private pendingDragReset = new Set<DiceId>();
 
   constructor(private container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -60,8 +60,8 @@ export class DiceRenderer {
     this.camera.position.set(0, -5, 10);
     this.camera.lookAt(0, -5, 0);
 
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const key = new THREE.DirectionalLight(0xffffff, 1.2);
+    this.scene.add(new THREE.AmbientLight(0xffffff, config.renderer.ambientLight));
+    const key = new THREE.DirectionalLight(0xffffff, config.renderer.keyLight);
     key.position.set(5, 5, 10);
     this.scene.add(key);
 
@@ -73,15 +73,14 @@ export class DiceRenderer {
   }
 
   private createPlates(): void {
-    const geometry = new THREE.PlaneGeometry(1, 1);
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.08,
-      depthWrite: false,
-    });
     for (let value = 6; value >= 1; value--) {
-      const plate = new THREE.Mesh(geometry, material);
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: config.renderer.plate.opacity,
+        depthWrite: false,
+      });
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
       plate.position.z = -0.5;
       this.plates.set(value, plate);
       this.scene.add(plate);
@@ -89,13 +88,24 @@ export class DiceRenderer {
   }
 
   private updatePlates(): void {
-    const width = this.layout.bounds.maxX - this.layout.bounds.minX + 0.8;
+    const plate = config.renderer.plate;
+    const width = this.layout.bounds.maxX - this.layout.bounds.minX + plate.horizontalPadding * 2;
     for (const band of this.layout.bands) {
-      const plate = this.plates.get(band.value);
-      if (!plate) continue;
-      plate.scale.set(width, band.top - band.bottom, 1);
-      plate.position.set(0, (band.top + band.bottom) / 2, -0.5);
+      const mesh = this.plates.get(band.value);
+      if (!mesh) continue;
+      const height = band.top - band.bottom + plate.verticalPadding * 2;
+      mesh.geometry.dispose();
+      mesh.geometry = createRoundedRectGeometry(width, height, plate.cornerRadius);
+      mesh.position.set(0, (band.top + band.bottom) / 2, -0.5);
+      const material = mesh.material as THREE.MeshBasicMaterial;
+      material.opacity = this.groupFullySelected(band.value) ? plate.selectedOpacity : plate.opacity;
     }
+  }
+
+  private groupFullySelected(value: number): boolean {
+    const dice = this.lastState?.dice ?? [];
+    const group = dice.filter((d) => d.value === value);
+    return group.length > 0 && group.every((d) => d.selected);
   }
 
   get domElement(): HTMLCanvasElement {
@@ -112,7 +122,7 @@ export class DiceRenderer {
   }
 
   private computeMaxPerRow(aspect: number): number {
-    return Math.max(MIN_PER_ROW, Math.min(MAX_PER_ROW, Math.round(6 * aspect)));
+    return Math.max(config.renderer.minPerRow, Math.min(config.renderer.maxPerRow, Math.round(6 * aspect)));
   }
 
   private relayout(): void {
@@ -129,8 +139,8 @@ export class DiceRenderer {
 
   private fitCamera(): void {
     const bounds = this.layout.bounds;
-    const contentWidth = Math.max(bounds.maxX - bounds.minX, 1) + CAMERA_PADDING * 2;
-    const contentHeight = Math.max(bounds.maxY - bounds.minY, 1) + CAMERA_PADDING * 2;
+    const contentWidth = Math.max(bounds.maxX - bounds.minX, 1) + config.renderer.cameraPadding * 2;
+    const contentHeight = Math.max(bounds.maxY - bounds.minY, 1) + config.renderer.cameraPadding * 2;
     const centerX = (bounds.minX + bounds.maxX) / 2;
     const centerY = (bounds.minY + bounds.maxY) / 2;
 
@@ -158,6 +168,7 @@ export class DiceRenderer {
   }
 
   sync(state: GameState): void {
+    this.captureDragForReset();
     this.finalizeAnimation();
     this.hasDice = state.dice.length > 0;
     this.lastState = state;
@@ -179,10 +190,13 @@ export class DiceRenderer {
       }
     }
 
+    this.applyGrabbedScale();
+
     this.updatePlates();
     this.fitCamera();
 
     if (transitions.length > 0) this.animate(transitions);
+    this.resetPendingDrag();
     if (this.selected.size > 0) this.ensureLoop();
     this.render();
   }
@@ -205,6 +219,7 @@ export class DiceRenderer {
       mesh = createD6Mesh(value);
       mesh.userData.dieId = id;
       mesh.userData.value = value;
+      mesh.userData.shakePhase = Math.random() * Math.PI * 2;
       this.meshes.set(id, mesh);
       this.scene.add(mesh);
     }
@@ -225,24 +240,22 @@ export class DiceRenderer {
       } else if (transition.kind === 'slide') {
         const mesh = this.meshes.get(transition.id);
         if (!mesh) continue;
-        mesh.position.set(transition.fromX, transition.fromY, 0);
         tweens.push({
           kind: 'slide',
           mesh,
-          fromX: transition.fromX,
-          fromY: transition.fromY,
+          fromX: mesh.position.x,
+          fromY: mesh.position.y,
           toX: transition.toX,
           toY: transition.toY,
         });
       } else {
         const mesh = this.ensureMesh(transition.id, transition.fromValue);
         setD6Value(mesh, transition.fromValue);
-        mesh.position.set(transition.fromX, transition.fromY, 0);
         tweens.push({
           kind: 'change',
           mesh,
-          fromX: transition.fromX,
-          fromY: transition.fromY,
+          fromX: mesh.position.x,
+          fromY: mesh.position.y,
           toX: transition.toX,
           toY: transition.toY,
           toValue: transition.toValue,
@@ -259,7 +272,7 @@ export class DiceRenderer {
 
   private stepTweens(now: number): void {
     if (this.tweens.length === 0) return;
-    const t = Math.min(1, (now - this.tweenStart) / ANIMATION_DURATION_MS);
+    const t = Math.min(1, (now - this.tweenStart) / config.renderer.animationDurationMs);
     const e = 1 - Math.pow(1 - t, 3);
 
     for (const tween of this.tweens) {
@@ -311,11 +324,112 @@ export class DiceRenderer {
   private applyShake(now: number): void {
     if (this.selected.size === 0) return;
     const t = now / 1000;
+    const shake = config.renderer.shake;
     for (const mesh of this.selected) {
       if (this.tweenMeshes.has(mesh)) continue;
-      mesh.rotation.z = Math.sin(t * 55) * 0.08;
-      mesh.rotation.x = Math.sin(t * 41) * 0.05;
+      const phase = (mesh.userData.shakePhase as number) ?? 0;
+      mesh.rotation.z = Math.sin(t * shake.zFrequency + phase) * shake.zAmplitude;
+      mesh.rotation.x = Math.sin(t * shake.xFrequency + phase * shake.xPhaseShift) * shake.xAmplitude;
     }
+  }
+
+  setDrag(drag: { id: DiceId; x: number; y: number } | null): void {
+    if (!drag) {
+      this.endDrag();
+      return;
+    }
+    const cursor = this.cursorWorld(drag.x, drag.y);
+    if (!cursor) return;
+    if (this.dragId !== drag.id) this.beginDrag(drag.id);
+    this.dragCursor = { x: cursor.x, y: cursor.y };
+    this.applyDragPositions();
+    this.render();
+  }
+
+  private beginDrag(id: DiceId): void {
+    this.dragId = id;
+    const group = this.dragGroupIds();
+    const n = group.length;
+    const cols = Math.max(1, Math.ceil(Math.sqrt(n)));
+    const spacing = config.renderer.dragSpacing;
+    const startX = -((cols - 1) / 2) * spacing;
+    const startY = config.renderer.dragLift + ((Math.ceil(n / cols) - 1) / 2) * spacing;
+    this.dragOffsets.clear();
+    for (let i = 0; i < n; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      this.dragOffsets.set(group[i], { x: startX + col * spacing, y: startY - row * spacing });
+    }
+    this.applyGrabbedScale();
+  }
+
+  private dragGroupIds(): DiceId[] {
+    const ids: DiceId[] = [];
+    for (const [id, mesh] of this.meshes) {
+      if (id === this.dragId || this.selected.has(mesh)) ids.push(id);
+    }
+    return ids;
+  }
+
+  private applyDragPositions(): void {
+    if (!this.dragCursor) return;
+    for (const [id, mesh] of this.meshes) {
+      const offset = this.dragOffsets.get(id);
+      if (!offset) continue;
+      mesh.position.x = this.dragCursor.x + offset.x;
+      mesh.position.y = this.dragCursor.y + offset.y;
+    }
+  }
+
+  private endDrag(): void {
+    for (const id of this.dragOffsets.keys()) {
+      const mesh = this.meshes.get(id);
+      const position = this.layout.positions.get(id);
+      if (mesh && position) mesh.position.set(position.x, position.y, 0);
+    }
+    this.dragId = null;
+    this.dragOffsets.clear();
+    this.dragCursor = null;
+    this.applyGrabbedScale();
+    this.render();
+  }
+
+  private captureDragForReset(): void {
+    for (const id of this.dragOffsets.keys()) this.pendingDragReset.add(id);
+    this.dragId = null;
+    this.dragOffsets.clear();
+    this.dragCursor = null;
+  }
+
+  private resetPendingDrag(): void {
+    for (const id of this.pendingDragReset) {
+      const mesh = this.meshes.get(id);
+      if (!mesh || this.tweenMeshes.has(mesh)) continue;
+      const position = this.layout.positions.get(id);
+      if (position) mesh.position.set(position.x, position.y, 0);
+    }
+    this.pendingDragReset.clear();
+  }
+
+  private applyGrabbedScale(): void {
+    for (const [id, mesh] of this.meshes) {
+      if (this.isScaleTweened(mesh)) continue;
+      mesh.scale.setScalar(this.dragOffsets.has(id) ? config.renderer.grabScale : 1);
+    }
+  }
+
+  private isScaleTweened(mesh: THREE.Mesh): boolean {
+    return this.tweens.some(
+      (tween) => tween.mesh === mesh && (tween.kind === 'appear' || tween.kind === 'remove'),
+    );
+  }
+
+  private cursorWorld(clientX: number, clientY: number): { x: number; y: number } | null {
+    this.raycaster.setFromCamera(this.ndc(clientX, clientY), this.camera);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    const target = new THREE.Vector3();
+    if (!this.raycaster.ray.intersectPlane(plane, target)) return null;
+    return { x: target.x, y: target.y };
   }
 
   private ensureLoop(): void {
@@ -351,7 +465,7 @@ export class DiceRenderer {
     const target = new THREE.Vector3();
     if (!this.raycaster.ray.intersectPlane(plane, target)) return undefined;
     for (const band of this.layout.bands) {
-      if (target.y <= band.top && target.y >= band.bottom - GROUP_GAP) return band.value;
+      if (target.y <= band.top && target.y >= band.bottom - config.layout.groupGap) return band.value;
     }
     return undefined;
   }
@@ -371,4 +485,21 @@ export class DiceRenderer {
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
+}
+
+function createRoundedRectGeometry(width: number, height: number, radius: number): THREE.ShapeGeometry {
+  const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+  const x = -width / 2;
+  const y = -height / 2;
+  const shape = new THREE.Shape();
+  shape.moveTo(x + r, y);
+  shape.lineTo(x + width - r, y);
+  shape.absarc(x + width - r, y + r, r, -Math.PI / 2, 0, false);
+  shape.lineTo(x + width, y + height - r);
+  shape.absarc(x + width - r, y + height - r, r, 0, Math.PI / 2, false);
+  shape.lineTo(x + r, y + height);
+  shape.absarc(x + r, y + height - r, r, Math.PI / 2, Math.PI, false);
+  shape.lineTo(x, y + r);
+  shape.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
+  return new THREE.ShapeGeometry(shape);
 }
