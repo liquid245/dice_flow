@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { computeTransitions, type DieSnapshot } from './animator';
+import type { OperationKind } from '../core/dice/types';
 
-function snap(id: string, value: number, x = 0, y = 0): DieSnapshot {
-  return { id, value, x, y };
+function snap(id: string, value: number, x = 0, y = 0, origin: OperationKind = 'add'): DieSnapshot {
+  return { id, value, x, y, origin };
 }
 
 describe('computeTransitions', () => {
@@ -16,9 +17,9 @@ describe('computeTransitions', () => {
     expect(computeTransitions([snap('a', 3)], [])).toEqual([{ kind: 'remove', id: 'a', x: 0, y: 0 }]);
   });
 
-  it('marks value change as change', () => {
-    expect(computeTransitions([snap('a', 3, 0, 0)], [snap('a', 5, 0, -2)])).toEqual([
-      { kind: 'change', id: 'a', fromX: 0, fromY: 0, toX: 0, toY: -2, fromValue: 3, toValue: 5 },
+  it('marks value change as change and carries the origin', () => {
+    expect(computeTransitions([snap('a', 3, 0, 0)], [snap('a', 5, 0, -2, 'move')])).toEqual([
+      { kind: 'change', id: 'a', fromX: 0, fromY: 0, toX: 0, toY: -2, fromValue: 3, toValue: 5, origin: 'move' },
     ]);
   });
 

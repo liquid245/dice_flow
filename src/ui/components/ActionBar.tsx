@@ -1,41 +1,63 @@
 import { selectedDice } from '../../core/selection/selection';
 import { useGame } from '../../app/game';
+import { config, type ButtonKey } from '../../config';
 
 export function ActionBar() {
   const { state, dispatch, canUndo, canRedo } = useGame();
   const selectedCount = selectedDice(state.dice).length;
   const hasDice = state.dice.length > 0;
 
+  const isOn = (key: ButtonKey) => config.buttonVisibility[key];
+
   return (
     <div className="action-bar">
-      <button disabled={selectedCount === 0} onClick={() => dispatch({ type: 'roll' })}>
-        Roll
-      </button>
-      <button disabled={!hasDice} onClick={() => dispatch({ type: 'reroll' })}>
-        ReRoll
-      </button>
-      <button onClick={() => dispatch({ type: 'add', count: selectedCount || 1 })}>
-        Add {selectedCount || 1}
-      </button>
-      <button disabled={!hasDice} onClick={() => dispatch({ type: 'delete' })}>
-        {selectedCount > 0 ? `Delete ${selectedCount}` : 'Delete'}
-      </button>
-      <button disabled={!canUndo()} onClick={() => dispatch({ type: 'undo' })}>
-        Undo
-      </button>
-      <button disabled={!canRedo()} onClick={() => dispatch({ type: 'redo' })}>
-        Redo
-      </button>
-      <button
-        disabled={!hasDice}
-        onClick={() => {
-          if (window.confirm('Clear the table?')) {
-            dispatch({ type: 'clear' });
-          }
-        }}
-      >
-        Clear
-      </button>
+      <div className="action-row">
+        {isOn('delete') && (
+          <button disabled={!hasDice} onClick={() => dispatch({ type: 'delete' })}>
+            {selectedCount > 0 ? `${config.buttons.delete} ${selectedCount}` : config.buttons.delete}
+          </button>
+        )}
+        {isOn('add') && (
+          <button onClick={() => dispatch({ type: 'add', count: selectedCount || 1 })}>
+            {config.buttons.add} {selectedCount || 1}
+          </button>
+        )}
+        {isOn('reroll') && (
+          <button disabled={!hasDice} onClick={() => dispatch({ type: 'reroll' })}>
+            {config.buttons.reroll}
+          </button>
+        )}
+      </div>
+      <div className="action-row">
+        {isOn('undo') && (
+          <button disabled={!canUndo()} onClick={() => dispatch({ type: 'undo' })}>
+            {config.buttons.undo}
+          </button>
+        )}
+        {isOn('redo') && (
+          <button disabled={!canRedo()} onClick={() => dispatch({ type: 'redo' })}>
+            {config.buttons.redo}
+          </button>
+        )}
+        {selectedCount > 0 ? (
+          isOn('roll') && (
+            <button onClick={() => dispatch({ type: 'roll' })}>{config.buttons.roll}</button>
+          )
+        ) : (
+          isOn('clear') && (
+            <button
+              disabled={!hasDice}
+              onClick={() => {
+                if (window.confirm('Clear the table?')) {
+                  dispatch({ type: 'clear' });
+                }
+              }}
+            >
+              {config.buttons.clear}
+            </button>
+          )
+        )}
+      </div>
     </div>
   );
 }

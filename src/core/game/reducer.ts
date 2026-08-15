@@ -18,6 +18,8 @@ export function reduce(state: GameState, action: GameAction, deps: EngineDeps): 
       return move(state, action.targetValue);
     case 'select':
       return select(state, action.ids, action.mode);
+    case 'selectGroups':
+      return selectGroupRange(state, action.min, action.max);
     case 'clear':
       return clear(state);
     default: {
@@ -53,6 +55,7 @@ function addDice(state: GameState, count: number, values: number[] | undefined, 
     dice: [...state.dice.map((d) => (d.selected ? { ...d, selected: false } : d)), ...added],
     swipeAddAvailable: false,
     rememberedValues: memory,
+    selectedGroups: null,
   };
 }
 
@@ -77,6 +80,7 @@ function deleteDice(state: GameState, count: number | undefined): GameState {
     dice: remaining,
     swipeAddAvailable: false,
     rememberedValues: memory,
+    selectedGroups: null,
   };
 }
 
@@ -87,7 +91,7 @@ function roll(state: GameState, deps: EngineDeps): GameState {
   const dice: Die[] = state.dice
     .filter((d) => ids.has(d.id))
     .map((d) => ({ ...d, value: rollD6(deps.random), selected: false, origin: 'roll' }));
-  return { ...state, dice, rememberedValues: [] };
+  return { ...state, dice, rememberedValues: [], selectedGroups: null };
 }
 
 function reroll(state: GameState, deps: EngineDeps): GameState {
@@ -99,7 +103,7 @@ function reroll(state: GameState, deps: EngineDeps): GameState {
   const dice: Die[] = state.dice.map((d) =>
     ids.has(d.id) ? { ...d, value: rollD6(deps.random), selected: false, origin: 'reroll' } : d,
   );
-  return { ...state, dice, rememberedValues: [] };
+  return { ...state, dice, rememberedValues: [], selectedGroups: null };
 }
 
 function move(state: GameState, targetValue: number): GameState {
@@ -109,7 +113,7 @@ function move(state: GameState, targetValue: number): GameState {
   const dice: Die[] = state.dice.map((d) =>
     ids.has(d.id) ? { ...d, value: targetValue, selected: false, origin: 'move' } : d,
   );
-  return { ...state, dice };
+  return { ...state, dice, selectedGroups: null };
 }
 
 function select(state: GameState, ids: string[], mode: SelectMode): GameState {
@@ -124,9 +128,19 @@ function select(state: GameState, ids: string[], mode: SelectMode): GameState {
     if (mode === 'add') return d.selected ? d : { ...d, selected: true };
     return d.selected ? { ...d, selected: false } : d;
   });
-  return { ...state, dice };
+  return { ...state, dice, selectedGroups: null };
+}
+
+function selectGroupRange(state: GameState, min: number, max: number): GameState {
+  const lo = Math.min(min, max);
+  const hi = Math.max(min, max);
+  const dice: Die[] = state.dice.map((d) => {
+    const selected = d.value >= lo && d.value <= hi;
+    return d.selected === selected ? d : { ...d, selected };
+  });
+  return { ...state, dice, selectedGroups: { min: lo, max: hi } };
 }
 
 function clear(state: GameState): GameState {
-  return { ...state, dice: [], swipeAddAvailable: true, rememberedValues: [] };
+  return { ...state, dice: [], swipeAddAvailable: true, rememberedValues: [], selectedGroups: null };
 }

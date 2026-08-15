@@ -30,15 +30,30 @@ export interface Layout {
   bounds: Bounds;
 }
 
-export function layout(dice: Die[], maxPerRow: number): Layout {
+export function layout(dice: Die[], maxPerRow: number, aspect: number): Layout {
   const positions = new Map<DiceId, DiePosition>();
   const bands: GroupBand[] = [];
   let cursor = 0;
 
+  const grouped = new Map<number, Die[]>();
+  for (const die of dice) {
+    const list = grouped.get(die.value);
+    if (list) list.push(die);
+    else grouped.set(die.value, [die]);
+  }
+
+  const counts: number[] = [];
   for (let value = 6; value >= 1; value--) {
-    const groupDice = dice.filter((d) => d.value === value);
+    const n = grouped.get(value)?.length ?? 0;
+    if (n > 0) counts.push(n);
+  }
+
+  const cols = columnsFor(counts, aspect, maxPerRow);
+
+  for (let value = 6; value >= 1; value--) {
+    const groupDice = grouped.get(value) ?? [];
     const count = groupDice.length;
-    const rows = count === 0 ? 1 : Math.max(1, Math.ceil(count / maxPerRow));
+    const rows = count === 0 ? 1 : Math.max(1, Math.ceil(count / cols));
 
     const rowCounts = new Array<number>(rows).fill(0);
     for (let i = 0; i < count; i++) {
@@ -61,6 +76,26 @@ export function layout(dice: Die[], maxPerRow: number): Layout {
   }
 
   return { positions, bands, bounds: computeBounds(positions, bands) };
+}
+
+export function columnsFor(counts: number[], aspect: number, maxPerRow: number): number {
+  const total = counts.reduce((a, b) => a + b, 0);
+  if (total <= 1) return 1;
+
+  let best = 1;
+  let bestError = Infinity;
+  for (let cols = 1; cols <= maxPerRow; cols++) {
+    let rows = 0;
+    for (const n of counts) rows += Math.max(1, Math.ceil(n / cols));
+    const height = rows * DIE_SPACING + (counts.length - 1) * GROUP_GAP;
+    const width = cols * DIE_SPACING;
+    const error = Math.abs(width / height - aspect);
+    if (error < bestError) {
+      bestError = error;
+      best = cols;
+    }
+  }
+  return best;
 }
 
 function computeBounds(positions: Map<DiceId, DiePosition>, bands: GroupBand[]): Bounds {

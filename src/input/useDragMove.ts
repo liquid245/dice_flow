@@ -11,6 +11,7 @@ interface PressState {
   startValue: number;
   startX: number;
   startY: number;
+  wasSelected: boolean;
 }
 
 export function useDragMove(
@@ -19,7 +20,7 @@ export function useDragMove(
   onTap: (dieId: string) => void,
   onSwipe?: (fromId: string, toId: string) => void,
   onSwipeEnd?: (fromId: string, toId: string | null) => void,
-  onDrag?: (drag: { id: string; x: number; y: number } | null) => void,
+  onDrag?: (drag: { id: string; x: number; y: number; solo?: boolean; target?: number } | null) => void,
 ) {
   const gesture = useRef(new DieGestureController());
   const press = useRef<PressState | null>(null);
@@ -41,11 +42,13 @@ export function useDragMove(
     if (!die) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     gesture.current.down();
+    const gameDie = engine.getState().dice.find((x) => x.id === die.id);
     press.current = {
       dieId: die.id,
       startValue: die.value,
       startX: event.clientX,
       startY: event.clientY,
+      wasSelected: gameDie?.selected ?? false,
     };
     last.current = { x: event.clientX, y: event.clientY };
     clearTimer();
@@ -53,7 +56,10 @@ export function useDragMove(
       gesture.current.timerExpired();
       const d = press.current;
       if (gesture.current.isDragging() && d) {
-        onDrag?.({ id: d.dieId, x: last.current.x, y: last.current.y });
+        if (!d.wasSelected) {
+          engine.dispatch({ type: 'select', ids: [d.dieId], mode: 'set' });
+        }
+        onDrag?.({ id: d.dieId, x: last.current.x, y: last.current.y, solo: !d.wasSelected });
       }
     }, config.input.dragDelayMs);
   }
@@ -64,7 +70,13 @@ export function useDragMove(
     last.current = { x: event.clientX, y: event.clientY };
     gesture.current.move(exceedsThreshold(d.startX, d.startY, event.clientX, event.clientY));
     if (gesture.current.isDragging()) {
-      onDrag?.({ id: d.dieId, x: event.clientX, y: event.clientY });
+      onDrag?.({
+        id: d.dieId,
+        x: event.clientX,
+        y: event.clientY,
+        solo: !d.wasSelected,
+        target: hitTest.groupAt(event.clientX, event.clientY),
+      });
       return;
     }
     if (gesture.current.isSwiping()) {
@@ -90,10 +102,15 @@ export function useDragMove(
     }
     const target = hitTest.groupAt(event.clientX, event.clientY);
     engine.beginTransaction();
-    engine.dispatch({ type: 'select', ids: [d.dieId], mode: 'add' });
+    engine.dispatch({ type: 'select', ids: [d.dieId], mode: d.wasSelected ? 'add' : 'set' });
     const selectedCount = engine.getState().dice.filter((x) => x.selected).length;
     const action = moveTarget(d.startValue, selectedCount, target);
-    if (action) engine.dispatch(action);
+    if (action) {
+      engine.dispatch(action);
+    } else {
+      engine.dispatch({ type: 'select', ids: [], mode: 'set' });
+      onDrag?.(null);
+    }
     engine.endTransaction();
   }
 

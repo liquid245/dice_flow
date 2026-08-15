@@ -5,6 +5,7 @@ import { DiceRenderer } from './DiceRenderer';
 import { useSwipeAdd } from '../input/useSwipeAdd';
 import { useDragMove } from '../input/useDragMove';
 import { useGroupSwipe } from '../input/useGroupSwipe';
+import { useBackgroundTap } from '../input/useBackgroundTap';
 import { TapCycleController, visualOrder } from '../input/tapCycle';
 import type { HitTest } from '../input/hitTest';
 
@@ -57,12 +58,12 @@ export function RendererCanvas() {
         dispatch(cycleRef.current.swipe(order, fromId, toId));
       } else {
         cycleRef.current.reset();
-        dispatch({ type: 'select', ids: [fromId], mode: 'set' });
       }
     },
     (drag) => rendererRef.current?.setDrag(drag),
   );
   const groupSwipe = useGroupSwipe(engine, hitTest);
+  const backgroundTap = useBackgroundTap(engine, hitTest);
 
   function mergeHandlers(
     ...handlers: Array<(event: ReactPointerEvent<HTMLDivElement>) => void>
@@ -73,17 +74,13 @@ export function RendererCanvas() {
   }
 
   const pointerHandlers = {
-    onPointerDown: mergeHandlers(swipe.onPointerDown, drag.onPointerDown, groupSwipe.onPointerDown),
+    onPointerDown: mergeHandlers(swipe.onPointerDown, drag.onPointerDown, groupSwipe.onPointerDown, backgroundTap.onPointerDown),
     onPointerMove: mergeHandlers(swipe.onPointerMove, drag.onPointerMove, groupSwipe.onPointerMove),
     onPointerUp: mergeHandlers(swipe.onPointerUp, drag.onPointerUp, groupSwipe.onPointerUp),
     onPointerCancel: mergeHandlers(swipe.onPointerCancel, drag.onPointerCancel, groupSwipe.onPointerCancel),
   };
 
   return (
-    <div ref={containerRef} className="table" {...pointerHandlers}>
-      {state.dice.length === 0 && (
-        <div className="empty-table">Swipe Finger to Add or Reduse Dices</div>
-      )}
-    </div>
+    <div ref={containerRef} className="table" {...pointerHandlers} />
   );
 }

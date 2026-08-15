@@ -1,47 +1,47 @@
-# DiceFlow — Product Specification
+# DiceFlow — Спецификация продукта
 
-## Product
+## Продукт
 
-DiceFlow is an assistant for tabletop wargames that makes dice rolling faster, easier and more enjoyable.
+DiceFlow — ассистент для настольных военных игр, который делает бросок кубиков быстрее, проще и приятнее.
 
-The product is based on a previous version that was already used successfully in real games.
+Продукт основан на предыдущей версии, которая уже успешно использовалась в реальных играх.
 
-The new version preserves the proven workflow while improving usability, Game Feel, performance and extensibility.
+Новая версия сохраняет проверенный рабочий процесс, улучшая удобство, Game Feel, производительность и расширяемость.
 
 ## MVP
 
-The MVP supports only standard six-sided dice (D6).
+MVP поддерживает только стандартные шестигранные кубики (D6).
 
-The core gameplay loop is:
+Основной игровой цикл:
 
 Roll → Result → Modify → Select → Next Roll
 
-A roll consists of selecting a number of dice and assigning each die a random value.
+Бросок состоит из выбора количества кубиков и назначения каждому кубику случайного значения.
 
-After a roll, the player can modify the result before the next roll.
+После броска игрок может изменить результат перед следующим броском.
 
-## Dice
+## Кубики
 
-Each die has:
+У каждого кубика есть:
 
-- type
-- value
-- selection state
-- visual state
+- тип;
+- значение;
+- состояние выбора;
+- визуальное состояние.
 
 MVP:
 
-D6 with values 1–6.
+D6 со значениями 1–6.
 
-The architecture must allow future dice with arbitrary numbers of faces and arbitrary face properties, but these are not implemented in the MVP.
+Архитектура должна позволять в будущем кубики с произвольным числом граней и произвольными свойствами граней, но они не реализуются в MVP.
 
-Selected dice are visually highlighted and slightly animated.
+Выбранные кубики визуально выделяются и слегка анимируются.
 
-## Game Table
+## Игровой стол
 
-The table displays dice grouped by value.
+Стол отображает кубики, сгруппированные по значению.
 
-For D6:
+Для D6:
 
 6
 5
@@ -50,181 +50,183 @@ For D6:
 2
 1
 
-Dice automatically move to the group corresponding to their current value.
+Кубики автоматически перемещаются в группу, соответствующую их текущему значению.
 
-The table must support working comfortably with large numbers of dice.
+Стол должен поддерживать комфортную работу с большим количеством кубиков.
 
-Dice created or modified by later operations should be visually distinguishable from the original roll.
+Кубики, созданные или изменённые поздними операциями, должны визуально отличаться от исходного броска.
 
-## Selection
+## Выбор
 
-The player can:
+Игрок может:
 
-- select individual dice;
-- select a range of dice;
-- select a group;
-- select multiple groups;
-- select a range of groups.
+- выбирать отдельные кубики;
+- выбирать диапазон кубиков;
+- выбирать группу;
+- выбирать несколько групп;
+- выбирать диапазон групп.
 
-Selection is performed through touch interaction.
+Выбор выполняется через сенсорное взаимодействие.
 
-Tap behaviour:
+Поведение тапа:
 
-- a tap on a non-selected die selects it;
-- a tap on another non-selected die selects the inclusive range from the first to the last die;
-- a tap on an already-selected die clears the selection;
-- a tap on a non-selected die while a range is selected clears the selection.
+- тап по невыбранному кубику выбирает его;
+- тап по другому невыбранному кубику выбирает диапазон включительно от первого до последнего кубика;
+- тап по уже выбранному кубику снимает выделение;
+- тап по невыбранному кубику, когда выбран диапазон, снимает выделение.
 
-Swipe: press a die and swipe toward other dice before the drag delay elapses. The range from the start die to the die currently under the finger is selected live, updating in real time. Once a swipe begins, drag does not engage.
+Свайп: нажать кубик и провести пальцем к другим кубикам до истечения задержки перетаскивания. Диапазон от начального кубика до кубика, находящегося под пальцем, выбирается в реальном времени. После начала свайпа перетаскивание не включается. Когда палец отпускается не над кубиком, выбранный диапазон сохраняется.
 
-Group swipe: swiping across groups selects the range of groups live, from the start group to the group currently under the finger.
+Свайп по группам: проведение по группам выбирает диапазон групп в реальном времени — от начальной группы до группы, находящейся под пальцем.
 
-Hold: press and hold a die for about one second (without moving past the threshold), then drag to move dice between groups.
+Удержание: нажать и удерживать кубик около секунды (не двигаясь за порог), затем перетащить для перемещения кубиков между группами.
 
-While a die is being dragged, it grows and follows the cursor; when several dice are moved, they gather around the cursor and follow it as a group.
+Пока кубик перетаскивается, он увеличивается и следует за курсором; при перемещении нескольких кубиков они собираются вокруг курсора и следуют за ним группой. Плашка группы, над которой находится перетаскиваемый кубик, подсвечивается. Если кубики отпущены не над новой группой, они возвращаются на исходные места, а выделение снимается.
 
-The exact gesture implementation may evolve during development.
+Точная реализация жестов может меняться в процессе разработки.
 
-## Actions
+## Действия
 
 ### Roll
 
-Roll starts a new roll iteration.
+Roll начинает новую итерацию броска.
 
-It rolls the selected dice and removes all dice that are not selected — they no longer participate.
+Он бросает выбранные кубики и удаляет все невыбранные кубики — они больше не участвуют.
 
-The Roll button is inactive when no dice are selected.
+Кнопка Roll неактивна, когда кубики не выбраны.
 
 ### ReRoll
 
-Rerolls the selected dice within the current iteration.
+Перебрасывает выбранные кубики в рамках текущей итерации.
 
-If no dice are selected, ReRoll rerolls every die on the table.
+Если кубики не выбраны, ReRoll перебрасывает каждый кубик на столе.
 
 ### Add
 
-Adds dice. Each added die receives a random value and immediately appears in the group matching that value.
+Добавляет кубики. Каждый добавленный кубик получает случайное значение и сразу появляется в группе, соответствующей этому значению.
 
-If dice are selected, the button displays the number selected.
+Если кубики выбраны, кнопка отображает количество выбранных.
 
-Example:
+Пример:
 
-5 selected → `Add 5`
+5 выбрано → `Add 5`
 
-If nothing is selected:
+Если ничего не выбрано:
 
 `Add 1`
 
-Deleted values are remembered: a die added without an explicit value reuses the value of the last deleted die, so delete-then-add leaves values unchanged. This memory is cleared by Roll, ReRoll and Clear.
+Значения удалённых кубиков запоминаются: кубик, добавленный без явного значения, повторно использует значение последнего удалённого кубика, поэтому удаление-и-добавление оставляет значения неизменными. Эта память сбрасывается действиями Roll, ReRoll и Clear.
 
-During the empty-table swipe, assigned values are remembered: if dice are removed and then re-added within the same gesture, they return with the same values.
+Во время свайпа на пустом столе выданные значения запоминаются: если кубики удалены, а затем снова добавлены в рамках того же жеста, они возвращаются с прежними значениями.
 
-Consecutive Add and Delete presses within one round coalesce into a single net action. For example, pressing "Add 5", then "Delete 2", then "Add 1" is recorded as a single "Add 4" action.
+Последовательные нажатия Add и Delete в рамках одного раунда объединяются в одно итоговое действие. Например, нажатие «Add 5», затем «Delete 2», затем «Add 1» записывается как одно действие «Add 4».
 
 ### Delete
 
-Deletes selected dice.
+Удаляет выбранные кубики.
 
-The button displays the number of selected dice when applicable.
+Кнопка отображает количество выбранных кубиков, когда применимо.
 
-If no dice are selected, Delete may remove the most recently added player-created die.
+Если кубики не выбраны, Delete может удалить последний добавленный игроком кубик.
 
-Deleted dice values are remembered so a subsequent Add returns the same value (see Add).
+Значения удалённых кубиков запоминаются, чтобы последующий Add вернул то же значение (см. Add).
 
 ### Move
 
-Moves selected dice into another group.
+Перемещает выбранные кубики в другую группу.
 
-The button displays the number of selected dice when applicable.
+Кнопка отображает количество выбранных кубиков, когда применимо.
+
+Удержание и перетаскивание кубика в группу — способ ввода Move. Если кубики отпущены не над новой группой, они возвращаются на исходные места, а выделение снимается.
 
 ### Enhance
 
-Increases the value of selected D6 dice by one.
+Увеличивает значение выбранных кубиков D6 на единицу.
 
-Enhance is a special case of Move (move +1). It is not implemented in the current MVP.
+Enhance — частный случай Move (перемещение на +1). Он не реализован в текущем MVP.
 
 ### Clear
 
-Completely clears the table after confirmation.
+Полностью очищает стол после подтверждения.
 
-## Empty Table
+## Пустой стол
 
-When the table contains no dice, the application displays:
+Когда на столе нет кубиков, приложение отображает:
 
 Swipe Finger to Add or Reduse Dices
 
-The swipe works only when the table is completely empty — after launch or after Clear.
+Свайп работает только когда стол полностью пуст — после запуска или после Clear.
 
-While the finger is held on the screen, vertical movement changes the number of dice.
+Пока палец удерживается на экране, вертикальное движение меняет количество кубиков.
 
-Dice appear immediately in their groups.
+Кубики сразу появляются в своих группах.
 
-Values assigned during the swipe are remembered: dice removed and then re-added during the same gesture return with the same values.
+Значения, выданные во время свайпа, запоминаются: кубики, удалённые и затем снова добавленные в рамках того же жеста, возвращаются с прежними значениями.
 
-After the finger is released, this special add/reduce interaction stops.
+После отпускания пальца этот особый режим добавления/уменьшения прекращается.
 
-The number of dice is fixed when the finger is released, and the whole gesture is treated as a single action.
+Количество кубиков фиксируется при отпускании пальца, и весь жест рассматривается как одно действие.
 
 ## Undo / Redo
 
-Undo and Redo operate on gameplay state.
+Undo и Redo работают с игровым состоянием.
 
-They have unlimited depth within the session.
+Они имеют неограниченную глубину в рамках сессии.
 
-Undo and Redo navigate the action history: every action except selection can be undone.
+Undo и Redo перемещаются по истории действий: любое действие, кроме выбора, может быть отменено.
 
-After a new action is performed following Undo, the abandoned Redo branch is removed.
+После выполнения нового действия после Undo заброшенная ветка Redo удаляется.
 
-Consecutive identical actions coalesce into a single undoable step. For example, pressing "Add 1" five times in a row is one action that adds five dice; an empty-table swipe is one action whose number of dice is fixed when the finger is released. A mixed Add/Delete sequence within one round also coalesces into a single net action: "Add 5, Delete 2, Add 1" is one "Add 4" step.
+Последовательные одинаковые действия объединяются в один отменяемый шаг. Например, пять нажатий «Add 1» подряд — это одно действие, добавляющее пять кубиков; свайп на пустом столе — одно действие, количество кубиков которого фиксируется при отпускании пальца. Смешанная последовательность Add/Delete в рамках одного раунда также объединяется в одно итоговое действие: «Add 5, Delete 2, Add 1» — это один шаг «Add 4».
 
-## History
+## История
 
-History records every action the player performs: Roll, ReRoll, Add, Delete, Move and Clear.
+История записывает каждое действие игрока: Roll, ReRoll, Add, Delete, Move и Clear.
 
-Undo and Redo navigate this same history and are not recorded as separate entries.
+Undo и Redo перемещаются по той же истории и не записываются как отдельные записи.
 
-Add and Delete within the same round are collapsed into a single net entry: "Add 5, Delete 2, Add 1" is recorded as "Add 4".
+Add и Delete в рамках одного раунда сворачиваются в одну итоговую запись: «Add 5, Delete 2, Add 1» записывается как «Add 4».
 
-Example:
+Пример:
 
 20d6 → Roll → 4d6:6 → ReRoll → 2d6:6 → Explode
 
-`4d6:6` means four dice with value 6.
+`4d6:6` означает четыре кубика со значением 6.
 
-`Explode` is a special case of Add and is not implemented in the MVP.
+`Explode` — частный случай Add и не реализован в MVP.
 
-Operations after the initial Roll receive different visual shades.
+Операции после исходного Roll получают разные визуальные оттенки.
 
-Dice associated with an operation receive the corresponding shade so the player can understand which results came from which operation.
+Кубики, связанные с операцией, получают соответствующий оттенок, чтобы игрок мог понять, какие результаты получены из какой операции.
 
-Only a limited number of recent history lines are visible during normal play.
+Во время обычной игры видно только ограниченное количество последних строк истории.
 
-A "Show Full History" function displays the history of the entire session.
+Функция «Show Full History» отображает историю всей сессии.
 
-Groups of rolls are separated by timestamps.
+Группы бросков разделяются метками времени.
 
-## Information Area
+## Информационная область
 
-The upper area of the interface is an information panel.
+Верхняя область интерфейса — информационная панель.
 
-The top row displays three segments in order:
+Верхняя строка отображает три сегмента по порядку:
 
-- total dice on the table;
-- changes since the last Roll or Clear;
-- selected dice count.
+- общее количество кубиков на столе;
+- изменения с момента последнего Roll или Clear;
+- количество выбранных кубиков.
 
-The changes segment shows only the actions performed since the most recent Roll or Clear. After a Roll or Clear it is empty until the next modification.
+Сегмент изменений показывает только действия, выполненные с момента последнего Roll или Clear. После Roll или Clear он пуст до следующего изменения.
 
-It does not have to permanently display History.
+Он не обязан постоянно отображать историю.
 
-Possible future content includes:
+Возможный будущий контент включает:
 
-- current dice statistics;
-- current results;
-- quotes;
-- messages.
+- текущую статистику кубиков;
+- текущие результаты;
+- цитаты;
+- сообщения.
 
-Example:
+Пример:
 
 20 D6
 
@@ -235,16 +237,16 @@ Example:
 2: 3
 1: 3
 
-Another possible display:
+Другой возможный вид:
 
-"Лучше умереть за Императора,
-чем жить для себя."
+«Лучше умереть за Императора,
+чем жить для себя.»
 
-The final content and priority of these modes may change during development.
+Окончательное содержание и приоритет этих режимов могут меняться в процессе разработки.
 
-## Interface
+## Интерфейс
 
-The main action bar contains:
+Главная панель действий содержит:
 
 Roll
 ReRoll
@@ -256,199 +258,199 @@ Undo
 Redo
 Clear
 
-When no dice are selected:
+Когда кубики не выбраны:
 
-Roll is inactive.
+Roll неактивна.
 
-ReRoll rerolls every die.
+ReRoll перебрасывает каждый кубик.
 
-Add displays `1`.
+Add отображает `1`.
 
-Move displays `1` if the action is available.
+Move отображает `1`, если действие доступно.
 
-Delete displays `Delete`.
+Delete отображает `Delete`.
 
-When dice are selected, the relevant buttons display the number of selected dice.
+Когда кубики выбраны, соответствующие кнопки отображают количество выбранных кубиков.
 
-The exact arrangement may change during UI development.
+Точное расположение может меняться в процессе разработки UI.
 
-## Visual Design
+## Визуальный дизайн
 
-The application uses 3D dice.
+Приложение использует 3D-кубики.
 
-The initial implementation should focus on:
+Первоначальная реализация должна сосредоточиться на:
 
-3D models
-Materials
-Lighting
-Animation
+3D-моделях
+Материалах
+Освещении
+Анимации
 Game Feel
 
-Pixel-art rendering is an optional visual layer and may be added later.
+Пиксель-арт — опциональный визуальный слой и может быть добавлен позже.
 
-It must not affect gameplay architecture.
+Он не должен влиять на игровую архитектуру.
 
 ## Game Feel
 
-Game Feel is a major part of the product.
+Game Feel — важная часть продукта.
 
-It may include:
+Может включать:
 
-- dice animations;
-- sounds;
-- particles;
-- visual effects;
-- camera effects;
-- special reactions to results.
+- анимации кубиков;
+- звуки;
+- частицы;
+- визуальные эффекты;
+- эффекты камеры;
+- особые реакции на результаты.
 
-Examples:
+Примеры:
 
-Add → pop sound
+Add → звук «поп»
 
-Delete → air/wind sound
+Delete → звук воздуха/ветра
 
-Roll → dice sound
+Roll → звук кубиков
 
-Good result → stronger sound and particles
+Хороший результат → более сильный звук и частицы
 
-Bad result → different sound and particles
+Плохой результат → другой звук и частицы
 
-The exact effects are subject to experimentation during development.
+Точные эффекты подлежат экспериментам в процессе разработки.
 
-Game Feel must not change gameplay rules.
+Game Feel не должен менять игровые правила.
 
-## Platform
+## Платформа
 
-DiceFlow is distributed as a PWA.
+DiceFlow распространяется как PWA.
 
-Requirements:
+Требования:
 
-- works in a browser;
-- can be installed on a device;
-- works offline after initial caching;
-- supports multiple device platforms;
-- starts very quickly;
-- uses minimal battery.
+- работает в браузере;
+- может быть установлен на устройство;
+- работает офлайн после первоначального кэширования;
+- поддерживает несколько платформ устройств;
+- запускается очень быстро;
+- минимально расходует заряд батареи.
 
-## Startup
+## Запуск
 
-The application should prioritize immediate usability.
+Приложение должно приоритизировать немедленную готовность к использованию.
 
-Preferred sequence:
+Предпочтительная последовательность:
 
-Open
-→ Show application
-→ Restore local state
-→ Interactive
-→ Optional background work
+Открытие
+→ Показать приложение
+→ Восстановить локальное состояние
+→ Интерактивно
+→ Опциональная фоновая работа
 
-Network requests must not unnecessarily delay the application.
+Сетевые запросы не должны без необходимости задерживать приложение.
 
-## Performance
+## Производительность
 
-The application should not continuously render when there is nothing to animate or interact with.
+Приложение не должно постоянно рендериться, когда нечего анимировать или с чем взаимодействовать.
 
-Preferred behaviour:
+Предпочтительное поведение:
 
 IDLE
-→ User interaction / animation
-→ Render
+→ Взаимодействие пользователя / анимация
+→ Рендер
 → IDLE
 
-Performance optimization must preserve responsiveness and visual quality.
+Оптимизация производительности должна сохранять отзывчивость и визуальное качество.
 
-## Future Features
+## Будущие функции
 
-The architecture must support future expansion, but these features are outside the MVP.
+Архитектура должна поддерживать будущее расширение, но эти функции вне MVP.
 
 ### Custom Dice
 
-Support for:
+Поддержка:
 
-- arbitrary numbers of faces;
-- arbitrary face values;
-- additional face properties;
-- special wargame dice.
+- произвольного количества граней;
+- произвольных значений граней;
+- дополнительных свойств граней;
+- специальных военных кубиков.
 
 ### Content Packs
 
-Support for:
+Поддержка:
 
-- dice sets;
-- backgrounds;
-- sounds;
-- effects;
-- visual themes.
+- наборов кубиков;
+- фонов;
+- звуков;
+- эффектов;
+- визуальных тем.
 
 ### Store and Payments
 
-Future support for content sales and purchases.
+Будущая поддержка продажи и покупки контента.
 
-The payment provider must remain replaceable.
+Поставщик платежей должен оставаться заменяемым.
 
 ### Remote Configuration
 
-Future support for remotely controlled:
+Будущая поддержка удалённо управляемых:
 
-- announcements;
-- images;
-- messages;
-- buttons;
-- feature information;
-- version information.
+- объявлений;
+- изображений;
+- сообщений;
+- кнопок;
+- информации о функциях;
+- информации о версии.
 
 ### Analytics
 
-Future support for measuring:
+Будущая поддержка измерения:
 
-- launches;
-- installations;
-- sessions;
-- active users;
-- platform;
-- application version.
+- запусков;
+- установок;
+- сессий;
+- активных пользователей;
+- платформы;
+- версии приложения.
 
-Analytics must not block startup.
+Аналитика не должна блокировать запуск.
 
 ### Feature Requests
 
-The application may provide a way to request features through:
+Приложение может предоставлять способ запроса функций через:
 
 - GitHub;
 - Telegram;
-- another external communication channel.
+- другой внешний канал связи.
 
 ### Buy Me a Coffee
 
-The application may provide a link for supporting the developer.
+Приложение может предоставлять ссылку для поддержки разработчика.
 
 ### Push Notifications
 
-Future possibility.
+Будущая возможность.
 
-Push notifications are not required for the MVP.
+Push-уведомления не требуются для MVP.
 
-## Non-Goals
+## Не-цели
 
-DiceFlow does not require:
+DiceFlow не требует:
 
-- physics-based dice;
-- online multiplayer;
-- server-side gameplay simulation;
-- accounts;
-- permanent network connection;
-- continuous rendering.
+- кубиков с физикой;
+- онлайн-мультиплеера;
+- серверной симуляции игрового процесса;
+- аккаунтов;
+- постоянного сетевого соединения;
+- непрерывного рендеринга.
 
-The game state and dice results are local.
+Игровое состояние и результаты кубиков локальны.
 
-## Product Principle
+## Принцип продукта
 
-The primary goal is not to maximize the number of features.
+Основная цель — не максимизировать количество функций.
 
-The primary goal is to make the existing dice workflow extremely fast, clear and pleasant.
+Основная цель — сделать существующий процесс работы с кубиками максимально быстрым, понятным и приятным.
 
-Every new feature should be evaluated against:
+Каждую новую функцию следует оценивать по критерию:
 
-"Does this make playing a wargame with DiceFlow faster, clearer or more enjoyable?"
+«Делает ли это игру в варгейм с DiceFlow быстрее, понятнее или приятнее?»
 
-If not, it should not be added to the MVP.
+Если нет, её не следует добавлять в MVP.

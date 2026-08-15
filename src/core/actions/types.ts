@@ -9,6 +9,7 @@ export type GameAction =
   | { type: 'delete'; count?: number }
   | { type: 'move'; targetValue: number }
   | { type: 'select'; ids: DiceId[]; mode: SelectMode }
+  | { type: 'selectGroups'; min: number; max: number }
   | { type: 'clear' };
 
 export type Action = GameAction | { type: 'undo' } | { type: 'redo' };

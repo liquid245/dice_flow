@@ -30,6 +30,7 @@ export function InfoPanel() {
         <span key={entry.id}> · {formatEntry(entry)}</span>
       ))}
       {selected > 0 && <span> · Selected: {selected}</span>}
+      {state.dice.length === 0 && <span> · Swipe Finger to Add or Reduse Dices</span>}
     </div>
   );
 }

@@ -33,7 +33,7 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
   }
 
   function dispatchGame(action: GameAction): void {
-    if (action.type === 'select') {
+    if (action.type === 'select' || action.type === 'selectGroups') {
       state = reduce(state, action, deps);
       lastAction = null;
       notify();
@@ -153,6 +153,8 @@ function makeEntry(action: GameAction, previous: GameState, next: GameState, dep
     case 'move':
       return { ...base, kind: 'move', count: selectedCount(previous), value: action.targetValue };
     case 'select':
+      return { ...base, kind: 'select', count: selectedCount(next) };
+    case 'selectGroups':
       return { ...base, kind: 'select', count: selectedCount(next) };
     case 'clear':
       return { ...base, kind: 'clear', count: previous.dice.length };

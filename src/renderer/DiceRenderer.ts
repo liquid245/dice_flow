@@ -1,25 +1,28 @@
 import * as THREE from 'three';
 import type { GameState } from '../core/game/state';
 import type { DiceId } from '../core/dice/types';
-import { createD6Mesh, setD6Value } from './dice';
+import { createD6Mesh, setD6Value, loadDiceModel, hasDiceModel } from './dice';
 import { layout, type Layout } from './layout';
 import { computeTransitions, type DieSnapshot, type Transition } from './animator';
 import type { DieHit } from '../input/hitTest';
 import { config } from '../config';
+import { playSound, type SoundName } from '../services/audio';
+import { plateOpacity } from './plateOpacity';
 
 type Tween =
-  | { kind: 'appear'; mesh: THREE.Mesh }
-  | { kind: 'remove'; mesh: THREE.Mesh }
-  | { kind: 'slide'; mesh: THREE.Mesh; fromX: number; fromY: number; toX: number; toY: number }
+  | { kind: 'appear'; mesh: THREE.Object3D }
+  | { kind: 'remove'; mesh: THREE.Object3D }
+  | { kind: 'slide'; mesh: THREE.Object3D; fromX: number; fromY: number; toX: number; toY: number }
   | {
       kind: 'change';
-      mesh: THREE.Mesh;
+      mesh: THREE.Object3D;
       fromX: number;
       fromY: number;
       toX: number;
       toY: number;
       toValue: number;
       valueApplied: boolean;
+      spin: boolean;
     };
 
 export class DiceRenderer {
@@ -28,22 +31,27 @@ export class DiceRenderer {
   private camera: THREE.OrthographicCamera;
   private raycaster = new THREE.Raycaster();
   private resizeObserver: ResizeObserver;
-  private meshes = new Map<DiceId, THREE.Mesh>();
-  private selected = new Set<THREE.Mesh>();
+  private meshes = new Map<DiceId, THREE.Object3D>();
+  private selected = new Set<THREE.Object3D>();
   private plates = new Map<number, THREE.Mesh>();
   private layout: Layout = { positions: new Map(), bands: [], bounds: { minX: -2, maxX: 2, minY: -1, maxY: 0 } };
   private lastState: GameState | null = null;
   private maxPerRow = 6;
   private prev: DieSnapshot[] = [];
   private tweens: Tween[] = [];
-  private tweenMeshes = new Set<THREE.Mesh>();
+  private tweenMeshes = new Set<THREE.Object3D>();
   private tweenStart = 0;
   private rafId: number | null = null;
   private hasDice = false;
+  private synced = false;
   private dragId: DiceId | null = null;
+  private dragSolo = false;
   private dragOffsets = new Map<DiceId, { x: number; y: number }>();
   private dragCursor: { x: number; y: number } | null = null;
+  private dragTarget: number | null = null;
   private pendingDragReset = new Set<DiceId>();
+  private plateTargets = new Map<number, number>();
+  private plateFades = new Map<number, { from: number; start: number }>();
 
   constructor(private container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -66,6 +74,12 @@ export class DiceRenderer {
     this.scene.add(key);
 
     this.createPlates();
+
+    loadDiceModel(config.assets.diceModel)
+      .then(() => {
+        if (this.lastState) this.sync(this.lastState);
+      })
+      .catch((error) => console.error('Failed to load dice model', error));
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
@@ -97,15 +111,73 @@ export class DiceRenderer {
       mesh.geometry.dispose();
       mesh.geometry = createRoundedRectGeometry(width, height, plate.cornerRadius);
       mesh.position.set(0, (band.top + band.bottom) / 2, -0.5);
-      const material = mesh.material as THREE.MeshBasicMaterial;
-      material.opacity = this.groupFullySelected(band.value) ? plate.selectedOpacity : plate.opacity;
     }
+    this.updatePlateHighlights();
   }
 
-  private groupFullySelected(value: number): boolean {
+  private updatePlateHighlights(): void {
+    const now = performance.now();
+    for (const band of this.layout.bands) {
+      const target = this.plateTargetOpacity(band.value);
+      const prev = this.plateTargets.get(band.value);
+      if (prev === target) continue;
+      this.plateTargets.set(band.value, target);
+      const mesh = this.plates.get(band.value);
+      if (!mesh) continue;
+      const material = mesh.material as THREE.MeshBasicMaterial;
+      if (Math.abs(material.opacity - target) < 0.001) {
+        material.opacity = target;
+      } else {
+        this.plateFades.set(band.value, { from: material.opacity, start: now });
+      }
+    }
+    if (this.plateFades.size > 0) this.ensureLoop();
+  }
+
+  private plateTargetOpacity(value: number): number {
+    const plate = config.renderer.plate;
+    if (this.dragTarget !== null && value === this.dragTarget) return plate.selectedOpacity;
+    const group = (this.lastState?.dice ?? []).filter((d) => d.value === value);
+    if (group.length === 0) {
+      return this.groupHighlighted(value) ? plate.selectedOpacity : plate.opacity;
+    }
+    if (config.renderer.plate.gradient) {
+      const selected = group.filter((d) => d.selected).length;
+      return plateOpacity(selected, group.length, plate.opacity, plate.selectedOpacity);
+    }
+    return this.groupHighlighted(value) ? plate.selectedOpacity : plate.opacity;
+  }
+
+  private stepPlateFade(now: number): boolean {
+    const tau = config.renderer.plate.fadeMs;
+    let active = false;
+    for (const [value, fade] of this.plateFades) {
+      const mesh = this.plates.get(value);
+      const target = this.plateTargets.get(value);
+      if (!mesh || target === undefined) {
+        this.plateFades.delete(value);
+        continue;
+      }
+      const material = mesh.material as THREE.MeshBasicMaterial;
+      const t = tau <= 0 ? 1 : (now - fade.start) / tau;
+      if (t >= 1) {
+        material.opacity = target;
+        this.plateFades.delete(value);
+      } else {
+        const e = 1 - Math.pow(1 - t, 3);
+        material.opacity = fade.from + (target - fade.from) * e;
+        active = true;
+      }
+    }
+    return active;
+  }
+
+  private groupHighlighted(value: number): boolean {
     const dice = this.lastState?.dice ?? [];
     const group = dice.filter((d) => d.value === value);
-    return group.length > 0 && group.every((d) => d.selected);
+    if (group.length > 0) return group.every((d) => d.selected);
+    const range = this.lastState?.selectedGroups;
+    return range != null && value >= range.min && value <= range.max;
   }
 
   get domElement(): HTMLCanvasElement {
@@ -116,23 +188,23 @@ export class DiceRenderer {
     const width = this.container.clientWidth || 1;
     const height = this.container.clientHeight || 1;
     this.renderer.setSize(width, height, false);
-    this.maxPerRow = this.computeMaxPerRow(width / height);
+    this.maxPerRow = config.renderer.maxPerRow;
     this.relayout();
     this.render();
   }
 
-  private computeMaxPerRow(aspect: number): number {
-    return Math.max(config.renderer.minPerRow, Math.min(config.renderer.maxPerRow, Math.round(6 * aspect)));
+  private get aspect(): number {
+    return (this.container.clientWidth || 1) / (this.container.clientHeight || 1);
   }
 
   private relayout(): void {
     const dice = this.lastState ? this.lastState.dice : [];
-    this.layout = layout(dice, this.maxPerRow);
+    this.layout = layout(dice, this.maxPerRow, this.aspect);
     for (const mesh of this.meshes.values()) {
       const position = this.layout.positions.get(mesh.userData.dieId as string);
       if (position) mesh.position.set(position.x, position.y, 0);
     }
-    this.prev = this.lastState ? this.snapshots(this.lastState) : [];
+    this.prev = this.synced && this.lastState ? this.snapshots(this.lastState) : [];
     this.updatePlates();
     this.fitCamera();
   }
@@ -168,11 +240,20 @@ export class DiceRenderer {
   }
 
   sync(state: GameState): void {
+    if (!hasDiceModel()) {
+      this.lastState = state;
+      return;
+    }
+    const isInitial = !this.synced;
+    this.synced = true;
+    const dragId = this.dragId;
+    const dragSolo = this.dragSolo;
+    const dragCursor = this.dragCursor;
     this.captureDragForReset();
     this.finalizeAnimation();
     this.hasDice = state.dice.length > 0;
     this.lastState = state;
-    this.layout = layout(state.dice, this.maxPerRow);
+    this.layout = layout(state.dice, this.maxPerRow, this.aspect);
 
     const next = this.snapshots(state);
     const transitions = computeTransitions(this.prev, next);
@@ -186,7 +267,7 @@ export class DiceRenderer {
 
     for (const mesh of this.meshes.values()) {
       if (!this.selected.has(mesh) && !this.tweenMeshes.has(mesh)) {
-        mesh.rotation.set(0, 0, 0);
+        this.animTarget(mesh).rotation.set(0, 0, 0);
       }
     }
 
@@ -195,8 +276,20 @@ export class DiceRenderer {
     this.updatePlates();
     this.fitCamera();
 
-    if (transitions.length > 0) this.animate(transitions);
+    if (transitions.length > 0) this.animate(transitions, !isInitial);
     this.resetPendingDrag();
+
+    if (dragId) {
+      const mesh = this.meshes.get(dragId);
+      if (mesh && !this.tweenMeshes.has(mesh)) {
+        this.dragSolo = dragSolo;
+        this.beginDrag(dragId);
+        this.dragCursor = dragCursor;
+        this.applyDragPositions();
+        this.applyGrabbedScale();
+      }
+    }
+
     if (this.selected.size > 0) this.ensureLoop();
     this.render();
   }
@@ -209,11 +302,12 @@ export class DiceRenderer {
         value: die.value,
         x: position?.x ?? 0,
         y: position?.y ?? 0,
+        origin: die.origin,
       };
     });
   }
 
-  private ensureMesh(id: DiceId, value: number): THREE.Mesh {
+  private ensureMesh(id: DiceId, value: number): THREE.Object3D {
     let mesh = this.meshes.get(id);
     if (!mesh) {
       mesh = createD6Mesh(value);
@@ -226,7 +320,22 @@ export class DiceRenderer {
     return mesh;
   }
 
-  private animate(transitions: Transition[]): void {
+  private animTarget(mesh: THREE.Object3D): THREE.Object3D {
+    return (mesh.userData.anim as THREE.Object3D) ?? mesh;
+  }
+
+  private animate(transitions: Transition[], playAudio: boolean): void {
+    if (playAudio) {
+      const sounds = new Set<SoundName>();
+      for (const transition of transitions) {
+        if (transition.kind === 'appear') sounds.add('appear');
+        else if (transition.kind === 'remove') sounds.add('disappear');
+        else if (transition.kind === 'change' && (transition.origin === 'roll' || transition.origin === 'reroll'))
+          sounds.add('roll');
+      }
+      for (const sound of sounds) playSound(sound);
+    }
+
     const tweens: Tween[] = [];
     for (const transition of transitions) {
       if (transition.kind === 'appear') {
@@ -260,6 +369,7 @@ export class DiceRenderer {
           toY: transition.toY,
           toValue: transition.toValue,
           valueApplied: false,
+          spin: transition.origin === 'roll' || transition.origin === 'reroll',
         });
       }
     }
@@ -278,8 +388,8 @@ export class DiceRenderer {
     for (const tween of this.tweens) {
       if (tween.kind === 'appear') {
         tween.mesh.scale.setScalar(e);
-        tween.mesh.rotation.x = e * Math.PI * 2;
-        tween.mesh.rotation.y = e * Math.PI * 2;
+        this.animTarget(tween.mesh).rotation.x = e * Math.PI * 2;
+        this.animTarget(tween.mesh).rotation.y = e * Math.PI * 2;
       } else if (tween.kind === 'remove') {
         tween.mesh.scale.setScalar(1 - e);
       } else if (tween.kind === 'slide') {
@@ -288,8 +398,10 @@ export class DiceRenderer {
       } else {
         tween.mesh.position.x = tween.fromX + (tween.toX - tween.fromX) * e;
         tween.mesh.position.y = tween.fromY + (tween.toY - tween.fromY) * e;
-        tween.mesh.rotation.x = e * Math.PI * 2;
-        tween.mesh.rotation.y = e * Math.PI * 2;
+        if (tween.spin) {
+          this.animTarget(tween.mesh).rotation.x = e * Math.PI * 2;
+          this.animTarget(tween.mesh).rotation.y = e * Math.PI * 2;
+        }
         if (!tween.valueApplied && t >= 0.5) {
           setD6Value(tween.mesh, tween.toValue);
           tween.valueApplied = true;
@@ -304,7 +416,7 @@ export class DiceRenderer {
     for (const tween of this.tweens) {
       if (tween.kind === 'appear') {
         tween.mesh.scale.setScalar(1);
-        tween.mesh.rotation.set(0, 0, 0);
+        this.animTarget(tween.mesh).rotation.set(0, 0, 0);
       } else if (tween.kind === 'remove') {
         this.scene.remove(tween.mesh);
         this.meshes.delete(tween.mesh.userData.dieId as string);
@@ -312,7 +424,7 @@ export class DiceRenderer {
         tween.mesh.position.set(tween.toX, tween.toY, 0);
       } else {
         tween.mesh.position.set(tween.toX, tween.toY, 0);
-        tween.mesh.rotation.set(0, 0, 0);
+        this.animTarget(tween.mesh).rotation.set(0, 0, 0);
         setD6Value(tween.mesh, tween.toValue);
         tween.mesh.userData.value = tween.toValue;
       }
@@ -328,21 +440,25 @@ export class DiceRenderer {
     for (const mesh of this.selected) {
       if (this.tweenMeshes.has(mesh)) continue;
       const phase = (mesh.userData.shakePhase as number) ?? 0;
-      mesh.rotation.z = Math.sin(t * shake.zFrequency + phase) * shake.zAmplitude;
-      mesh.rotation.x = Math.sin(t * shake.xFrequency + phase * shake.xPhaseShift) * shake.xAmplitude;
+      const anim = this.animTarget(mesh);
+      anim.rotation.z = Math.sin(t * shake.zFrequency + phase) * shake.zAmplitude;
+      anim.rotation.x = Math.sin(t * shake.xFrequency + phase * shake.xPhaseShift) * shake.xAmplitude;
     }
   }
 
-  setDrag(drag: { id: DiceId; x: number; y: number } | null): void {
+  setDrag(drag: { id: DiceId; x: number; y: number; solo?: boolean; target?: number } | null): void {
     if (!drag) {
       this.endDrag();
       return;
     }
     const cursor = this.cursorWorld(drag.x, drag.y);
     if (!cursor) return;
+    this.dragSolo = drag.solo ?? false;
     if (this.dragId !== drag.id) this.beginDrag(drag.id);
     this.dragCursor = { x: cursor.x, y: cursor.y };
+    this.dragTarget = drag.target ?? null;
     this.applyDragPositions();
+    this.updatePlateHighlights();
     this.render();
   }
 
@@ -364,6 +480,9 @@ export class DiceRenderer {
   }
 
   private dragGroupIds(): DiceId[] {
+    if (this.dragSolo) {
+      return this.dragId ? [this.dragId] : [];
+    }
     const ids: DiceId[] = [];
     for (const [id, mesh] of this.meshes) {
       if (id === this.dragId || this.selected.has(mesh)) ids.push(id);
@@ -390,7 +509,10 @@ export class DiceRenderer {
     this.dragId = null;
     this.dragOffsets.clear();
     this.dragCursor = null;
+    this.dragSolo = false;
+    this.dragTarget = null;
     this.applyGrabbedScale();
+    this.updatePlateHighlights();
     this.render();
   }
 
@@ -399,6 +521,8 @@ export class DiceRenderer {
     this.dragId = null;
     this.dragOffsets.clear();
     this.dragCursor = null;
+    this.dragSolo = false;
+    this.dragTarget = null;
   }
 
   private resetPendingDrag(): void {
@@ -418,7 +542,7 @@ export class DiceRenderer {
     }
   }
 
-  private isScaleTweened(mesh: THREE.Mesh): boolean {
+  private isScaleTweened(mesh: THREE.Object3D): boolean {
     return this.tweens.some(
       (tween) => tween.mesh === mesh && (tween.kind === 'appear' || tween.kind === 'remove'),
     );
@@ -439,9 +563,10 @@ export class DiceRenderer {
   private tick = (now: number) => {
     this.stepTweens(now);
     this.applyShake(now);
+    const fading = this.stepPlateFade(now);
     this.render();
 
-    const active = this.tweens.length > 0 || this.selected.size > 0;
+    const active = this.tweens.length > 0 || this.selected.size > 0 || fading;
     this.rafId = active ? requestAnimationFrame(this.tick) : null;
   };
 
@@ -452,10 +577,12 @@ export class DiceRenderer {
   dieAt(clientX: number, clientY: number): DieHit | null {
     if (!this.hasDice) return null;
     this.raycaster.setFromCamera(this.ndc(clientX, clientY), this.camera);
-    const hits = this.raycaster.intersectObjects([...this.meshes.values()], false);
+    const hits = this.raycaster.intersectObjects([...this.meshes.values()], true);
     if (hits.length === 0) return null;
-    const mesh = hits[0].object as THREE.Mesh;
-    return { id: mesh.userData.dieId as string, value: mesh.userData.value as number };
+    let obj: THREE.Object3D | null = hits[0].object;
+    while (obj && !obj.userData.dieId) obj = obj.parent;
+    if (!obj) return null;
+    return { id: obj.userData.dieId as string, value: obj.userData.value as number };
   }
 
   groupAt(clientX: number, clientY: number): number | undefined {
@@ -464,6 +591,10 @@ export class DiceRenderer {
     const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
     const target = new THREE.Vector3();
     if (!this.raycaster.ray.intersectPlane(plane, target)) return undefined;
+    const halfWidth =
+      (this.layout.bounds.maxX - this.layout.bounds.minX) / 2 +
+      config.renderer.plate.horizontalPadding;
+    if (target.x < -halfWidth || target.x > halfWidth) return undefined;
     for (const band of this.layout.bands) {
       if (target.y <= band.top && target.y >= band.bottom - config.layout.groupGap) return band.value;
     }

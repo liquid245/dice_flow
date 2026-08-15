@@ -7,7 +7,7 @@ import { config } from '../config';
 
 interface Gesture {
   session: SwipeAddSession;
-  startX: number;
+  startY: number;
   active: boolean;
 }
 
@@ -21,7 +21,7 @@ export function useSwipeAdd(engine: InputEngine, enabled: () => boolean) {
     engine.beginTransaction();
     gesture.current = {
       session: new SwipeAddSession(() => rollD6(Math.random)),
-      startX: event.clientX,
+      startY: event.clientY,
       active: true,
     };
   }
@@ -29,7 +29,7 @@ export function useSwipeAdd(engine: InputEngine, enabled: () => boolean) {
   function move(event: ReactPointerEvent<HTMLDivElement>) {
     const g = gesture.current;
     if (!g || !g.active) return;
-    const target = Math.round((event.clientX - g.startX) / config.input.pixelsPerDie);
+    const target = Math.round((g.startY - event.clientY) / config.input.swipeSensitivityPx);
     for (const action of g.session.setCount(target)) {
       engine.dispatch(action);
     }

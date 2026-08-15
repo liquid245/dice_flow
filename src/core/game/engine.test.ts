@@ -73,6 +73,14 @@ describe('engine', () => {
     expect(engine.canUndo()).toBe(false);
   });
 
+  it('group-range selection is not recorded', () => {
+    const engine = createEngine(makeDeps());
+    engine.dispatch({ type: 'add', count: 3, values: [1, 2, 3] });
+    engine.dispatch({ type: 'selectGroups', min: 1, max: 2 });
+    expect(engine.getState().dice.filter((d) => d.selected)).toHaveLength(2);
+    expect(engine.getState().history.map((e) => e.kind)).toEqual(['add']);
+  });
+
   it('coalesces consecutive adds into a single action', () => {
     const engine = createEngine(makeDeps());
     engine.dispatch({ type: 'add', count: 1 });
@@ -178,7 +186,7 @@ describe('engine', () => {
     engine.dispatch({ type: 'add', count: 2 });
     expect(engine.canUndo()).toBe(true);
 
-    engine.restore({ dice: [], history: [], swipeAddAvailable: false, rememberedValues: [] });
+    engine.restore({ dice: [], history: [], swipeAddAvailable: false, rememberedValues: [], selectedGroups: null });
     expect(engine.getState().dice).toHaveLength(0);
     expect(engine.getState().swipeAddAvailable).toBe(false);
     expect(engine.canUndo()).toBe(false);

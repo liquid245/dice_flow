@@ -25,7 +25,7 @@ function die(id: string, value: number, selected = false, origin: Die['origin'] 
 const rand = (v: number) => (v - 1) / 6;
 
 function stateWith(dice: Die[]): GameState {
-  return { dice, history: [], swipeAddAvailable: false, rememberedValues: [] };
+  return { dice, history: [], swipeAddAvailable: false, rememberedValues: [], selectedGroups: null };
 }
 
 describe('add', () => {
@@ -205,6 +205,41 @@ describe('select', () => {
     expect(selectedDice(s1.dice).map((d) => d.id)).toEqual(['a', 'b']);
     const s2 = reduce(s1, { type: 'select', ids: ['a'], mode: 'remove' }, makeDeps([]));
     expect(selectedDice(s2.dice).map((d) => d.id)).toEqual(['b']);
+  });
+
+  it('clears the selected group range', () => {
+    const s0 = reduce(state, { type: 'selectGroups', min: 1, max: 3 }, makeDeps([]));
+    expect(s0.selectedGroups).toEqual({ min: 1, max: 3 });
+    const next = reduce(s0, { type: 'select', ids: ['a'], mode: 'set' }, makeDeps([]));
+    expect(next.selectedGroups).toBeNull();
+  });
+});
+
+describe('selectGroups', () => {
+  const state = stateWith([die('a', 1), die('b', 2), die('c', 3), die('d', 4), die('e', 5)]);
+
+  it('selects all dice in the inclusive value range', () => {
+    const next = reduce(state, { type: 'selectGroups', min: 2, max: 4 }, makeDeps([]));
+    expect(selectedDice(next.dice).map((d) => d.id)).toEqual(['b', 'c', 'd']);
+    expect(next.selectedGroups).toEqual({ min: 2, max: 4 });
+  });
+
+  it('is direction-agnostic', () => {
+    const next = reduce(state, { type: 'selectGroups', min: 4, max: 2 }, makeDeps([]));
+    expect(selectedDice(next.dice).map((d) => d.id)).toEqual(['b', 'c', 'd']);
+    expect(next.selectedGroups).toEqual({ min: 2, max: 4 });
+  });
+
+  it('keeps the range for empty groups', () => {
+    const next = reduce(state, { type: 'selectGroups', min: 3, max: 3 }, makeDeps([]));
+    expect(selectedDice(next.dice).map((d) => d.id)).toEqual(['c']);
+    expect(next.selectedGroups).toEqual({ min: 3, max: 3 });
+  });
+
+  it('is cleared by a non-selection action', () => {
+    const selected = reduce(state, { type: 'selectGroups', min: 2, max: 4 }, makeDeps([]));
+    const moved = reduce(selected, { type: 'move', targetValue: 5 }, makeDeps([]));
+    expect(moved.selectedGroups).toBeNull();
   });
 });
 

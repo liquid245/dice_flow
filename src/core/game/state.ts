@@ -6,8 +6,15 @@ export interface GameState {
   history: HistoryEntry[];
   swipeAddAvailable: boolean;
   rememberedValues: number[];
+  selectedGroups: { min: number; max: number } | null;
 }
 
 export function createInitialState(): GameState {
-  return { dice: [], history: [], swipeAddAvailable: true, rememberedValues: [] };
+  return {
+    dice: [],
+    history: [],
+    swipeAddAvailable: true,
+    rememberedValues: [],
+    selectedGroups: null,
+  };
 }

@@ -1,8 +1,11 @@
+import type { OperationKind } from '../core/dice/types';
+
 export interface DieSnapshot {
   id: string;
   value: number;
   x: number;
   y: number;
+  origin: OperationKind;
 }
 
 export type Transition =
@@ -17,6 +20,7 @@ export type Transition =
       toY: number;
       fromValue: number;
       toValue: number;
+      origin: OperationKind;
     }
   | { kind: 'slide'; id: string; fromX: number; fromY: number; toX: number; toY: number };
 
@@ -39,6 +43,7 @@ export function computeTransitions(prev: DieSnapshot[], next: DieSnapshot[]): Tr
         toY: n.y,
         fromValue: p.value,
         toValue: n.value,
+        origin: n.origin,
       });
     } else if (p.x !== n.x || p.y !== n.y) {
       transitions.push({ kind: 'slide', id: n.id, fromX: p.x, fromY: p.y, toX: n.x, toY: n.y });

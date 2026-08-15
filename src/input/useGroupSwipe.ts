@@ -38,7 +38,7 @@ export function useGroupSwipe(engine: InputEngine, hitTest: HitTest) {
     }
     const endValue = hitTest.groupAt(event.clientX, event.clientY);
     if (endValue === undefined) return;
-    engine.dispatch(selectRangeGroups(engine.getState().dice, s.startValue, endValue));
+    engine.dispatch(selectRangeGroups(s.startValue, endValue));
   }
 
   function up(event: ReactPointerEvent<HTMLDivElement>) {
@@ -46,14 +46,13 @@ export function useGroupSwipe(engine: InputEngine, hitTest: HitTest) {
     if (!s) return;
     state.current = null;
 
-    const dice = engine.getState().dice;
     if (!s.dragging) {
-      engine.dispatch(selectRangeGroups(dice, s.startValue, s.startValue));
+      engine.dispatch(selectRangeGroups(s.startValue, s.startValue));
       return;
     }
     const endValue = hitTest.groupAt(event.clientX, event.clientY);
     if (endValue === undefined) return;
-    engine.dispatch(selectRangeGroups(dice, s.startValue, endValue));
+    engine.dispatch(selectRangeGroups(s.startValue, endValue));
   }
 
   function cancel() {

@@ -1,18 +1,54 @@
+type DiceFaceRotation = [number, number, number];
+
+export type ButtonKey = 'roll' | 'reroll' | 'add' | 'delete' | 'undo' | 'redo' | 'clear';
+
+const buttons: Record<ButtonKey, string> = {
+  roll: 'Roll',
+  reroll: 'ReRoll',
+  add: 'Add',
+  delete: 'Delete',
+  undo: 'Undo',
+  redo: 'Redo',
+  clear: 'Clear',
+};
+
+const buttonVisibility: Record<ButtonKey, boolean> = {
+  roll: true,
+  reroll: true,
+  add: true,
+  delete: true,
+  undo: true,
+  redo: true,
+  clear: true,
+};
+
+// Поворот (x, y, z) в радианах, чтобы грань с этим значением смотрела на камеру (+Z).
+const diceFaces: Record<number, DiceFaceRotation> = {
+  1: [0, Math.PI / 2, 0],
+  2: [0, -Math.PI / 2, 0],
+  3: [-Math.PI / 2, 0, 0],
+  4: [Math.PI / 2, 0, 0],
+  5: [0, Math.PI, 0],
+  6: [0, 0, 0],
+};
+
 export const config = {
   renderer: {
     animationDurationMs: 400,
-    cameraPadding: 1.0,
+    cameraPadding: 0.80,
     grabScale: 1.25,
     dragLift: 0,
     dragSpacing: 0.55,
-    minPerRow: 4,
+    minPerRow: 0,
     maxPerRow: 10,
     plate: {
       verticalPadding: 0.15,
-      horizontalPadding: 0.4,
+      horizontalPadding: 7.6,
       cornerRadius: 0.16,
-      opacity: 0.08,
+      opacity: 0.02,
       selectedOpacity: 0.25,
+      gradient: true,
+      fadeMs: 250,
     },
     ambientLight: 0.6,
     keyLight: 1.2,
@@ -32,9 +68,20 @@ export const config = {
   input: {
     dragThresholdPx: 8,
     dragDelayMs: 1000,
-    pixelsPerDie: 28,
+    swipeSensitivityPx: 5,
   },
   storage: {
     saveDebounceMs: 500,
   },
+  assets: {
+    sounds: {
+      appear: '/sounds/850097__lbrady240__pop11.wav',
+      roll: '/sounds/629982__flem0527__dice-rolling-on-table.wav',
+      disappear: '/sounds/poof.wav',
+    },
+    diceModel: '/models/dice.glb',
+    diceFaces,
+  },
+  buttons,
+  buttonVisibility,
 };
