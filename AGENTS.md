@@ -236,8 +236,15 @@ For every task:
 6. Run validation.
 7. Inspect the diff.
 8. Report what changed and what was verified.
+9. Bump the `version` in `package.json` (patch/minor) and commit + push.
 
 Do not rewrite large parts of the project when a smaller change is sufficient.
+
+At the current stage every change is for testing: after implementing and
+validating a change, bump `package.json` `version`, commit and push.
+GitHub Actions deploys to GitHub Pages automatically on push to `main`.
+The build injects a timestamp, but the semantic version is read from
+`package.json`.
 
 ## Git
 
