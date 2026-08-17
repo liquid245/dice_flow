@@ -284,7 +284,14 @@ function simplify(modifier, geometry, ratio) {
   if (count === 0) return geometry;
   const collapses = Math.max(1, Math.round(count * (1 - ratio)));
   const simplified = modifier.modify(geometry, collapses);
-  return simplified.attributes.position?.count > 0 ? simplified : geometry;
+  if (simplified.attributes.position?.count === 0) return simplified;
+  // SimplifyModifier corrupts tangent handedness (w) by averaging Vector4 w;
+  // regenerate tangents from position/normal/uv so normal maps stay clean.
+  simplified.deleteAttribute('tangent');
+  if (simplified.index && simplified.attributes.normal && simplified.attributes.uv) {
+    simplified.computeTangents();
+  }
+  return simplified;
 }
 
 function processModel(sourceBytes, name) {
