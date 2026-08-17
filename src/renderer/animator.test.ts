@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeTransitions, type DieSnapshot } from './animator';
+import { computeTransitions, controlsRotation, type DieSnapshot } from './animator';
 import type { OperationKind } from '../core/dice/types';
 
 function snap(id: string, value: number, x = 0, y = 0, origin: OperationKind = 'add'): DieSnapshot {
@@ -54,5 +54,21 @@ describe('computeTransitions', () => {
     expect(transitions.some((t) => t.kind === 'change' && t.id === 'a')).toBe(true);
     expect(transitions.some((t) => t.kind === 'remove' && t.id === 'b')).toBe(true);
     expect(transitions.some((t) => t.kind === 'appear' && t.id === 'c')).toBe(true);
+  });
+});
+
+describe('controlsRotation', () => {
+  it('drives rotation for appear', () => {
+    expect(controlsRotation('appear', false)).toBe(true);
+  });
+
+  it('drives rotation only for spinning changes', () => {
+    expect(controlsRotation('change', true)).toBe(true);
+    expect(controlsRotation('change', false)).toBe(false);
+  });
+
+  it('does not drive rotation for slide or remove', () => {
+    expect(controlsRotation('slide', false)).toBe(false);
+    expect(controlsRotation('remove', false)).toBe(false);
   });
 });

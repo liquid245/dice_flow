@@ -3,7 +3,7 @@ import type { GameState } from '../core/game/state';
 import type { DiceId, Die } from '../core/dice/types';
 import { createD6Mesh, setD6Value, loadDiceModel, hasDiceModel } from './dice';
 import { layout, type Layout } from './layout';
-import { computeTransitions, type DieSnapshot, type Transition } from './animator';
+import { computeTransitions, controlsRotation, type DieSnapshot, type Transition } from './animator';
 import type { DieHit } from '../input/hitTest';
 import { config } from '../config';
 import { playSound, type SoundName } from '../services/audio';
@@ -281,7 +281,7 @@ export class DiceRenderer {
     }
 
     for (const mesh of this.meshes.values()) {
-      if (!this.selected.has(mesh) && !this.tweenMeshes.has(mesh)) {
+      if (!this.selected.has(mesh) && !this.isRotationTweened(mesh)) {
         this.animTarget(mesh).rotation.set(0, 0, 0);
       }
     }
@@ -569,6 +569,12 @@ export class DiceRenderer {
   private isScaleTweened(mesh: THREE.Object3D): boolean {
     return this.tweens.some(
       (tween) => tween.mesh === mesh && (tween.kind === 'appear' || tween.kind === 'remove'),
+    );
+  }
+
+  private isRotationTweened(mesh: THREE.Object3D): boolean {
+    return this.tweens.some(
+      (tween) => tween.mesh === mesh && controlsRotation(tween.kind, tween.kind === 'change' && tween.spin),
     );
   }
 
