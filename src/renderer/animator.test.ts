@@ -33,6 +33,18 @@ describe('computeTransitions', () => {
     expect(computeTransitions([snap('a', 3)], [snap('a', 3)])).toEqual([]);
   });
 
+  it('marks a reroll that lands on the same value as change with the reroll origin', () => {
+    expect(computeTransitions([snap('a', 3, 0, 0, 'add')], [snap('a', 3, 0, 0, 'reroll')])).toEqual([
+      { kind: 'change', id: 'a', fromX: 0, fromY: 0, toX: 0, toY: 0, fromValue: 3, toValue: 3, origin: 'reroll' },
+    ]);
+  });
+
+  it('marks a roll that lands on the same value as change with the roll origin', () => {
+    expect(computeTransitions([snap('a', 5, 0, 0, 'add')], [snap('a', 5, 0, 0, 'roll')])).toEqual([
+      { kind: 'change', id: 'a', fromX: 0, fromY: 0, toX: 0, toY: 0, fromValue: 5, toValue: 5, origin: 'roll' },
+    ]);
+  });
+
   it('handles a mix in one step', () => {
     const transitions = computeTransitions(
       [snap('a', 3), snap('b', 6)],

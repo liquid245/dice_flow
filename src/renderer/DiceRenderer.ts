@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { GameState } from '../core/game/state';
-import type { DiceId } from '../core/dice/types';
+import type { DiceId, Die } from '../core/dice/types';
 import { createD6Mesh, setD6Value, loadDiceModel, hasDiceModel } from './dice';
 import { layout, type Layout } from './layout';
 import { computeTransitions, type DieSnapshot, type Transition } from './animator';
@@ -101,7 +101,7 @@ export class DiceRenderer {
     }
   }
 
-  private updatePlates(): void {
+  private updatePlateGeometry(): void {
     const plate = config.renderer.plate;
     const width = this.layout.bounds.maxX - this.layout.bounds.minX + plate.horizontalPadding * 2;
     for (const band of this.layout.bands) {
@@ -112,7 +112,6 @@ export class DiceRenderer {
       mesh.geometry = createRoundedRectGeometry(width, height, plate.cornerRadius);
       mesh.position.set(0, (band.top + band.bottom) / 2, -0.5);
     }
-    this.updatePlateHighlights();
   }
 
   private updatePlateHighlights(): void {
@@ -205,7 +204,8 @@ export class DiceRenderer {
       if (position) mesh.position.set(position.x, position.y, 0);
     }
     this.prev = this.synced && this.lastState ? this.snapshots(this.lastState) : [];
-    this.updatePlates();
+    this.updatePlateGeometry();
+    this.updatePlateHighlights();
     this.fitCamera();
   }
 
@@ -252,12 +252,19 @@ export class DiceRenderer {
     this.captureDragForReset();
     this.finalizeAnimation();
     this.hasDice = state.dice.length > 0;
-    this.lastState = state;
-    this.layout = layout(state.dice, this.maxPerRow, this.aspect);
 
-    const next = this.snapshots(state);
-    const transitions = computeTransitions(this.prev, next);
-    this.prev = next;
+    const layoutChanged = isInitial || this.layoutChanged(this.lastState?.dice ?? [], state.dice);
+    this.lastState = state;
+
+    if (layoutChanged) {
+      this.layout = layout(state.dice, this.maxPerRow, this.aspect);
+      const next = this.snapshots(state);
+      const transitions = computeTransitions(this.prev, next);
+      this.prev = next;
+      this.updatePlateGeometry();
+      this.fitCamera();
+      if (transitions.length > 0) this.animate(transitions, !isInitial);
+    }
 
     this.selected.clear();
     for (const die of state.dice) {
@@ -272,11 +279,7 @@ export class DiceRenderer {
     }
 
     this.applyGrabbedScale();
-
-    this.updatePlates();
-    this.fitCamera();
-
-    if (transitions.length > 0) this.animate(transitions, !isInitial);
+    this.updatePlateHighlights();
     this.resetPendingDrag();
 
     if (dragId) {
@@ -292,6 +295,19 @@ export class DiceRenderer {
 
     if (this.selected.size > 0) this.ensureLoop();
     this.render();
+  }
+
+  private layoutChanged(prev: Die[], next: Die[]): boolean {
+    if (prev.length !== next.length) return true;
+    for (let i = 0; i < prev.length; i++) {
+      if (
+        prev[i].id !== next[i].id ||
+        prev[i].value !== next[i].value ||
+        prev[i].origin !== next[i].origin
+      )
+        return true;
+    }
+    return false;
   }
 
   private snapshots(state: GameState): DieSnapshot[] {

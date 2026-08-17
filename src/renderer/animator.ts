@@ -33,7 +33,10 @@ export function computeTransitions(prev: DieSnapshot[], next: DieSnapshot[]): Tr
     const p = prevById.get(n.id);
     if (!p) {
       transitions.push({ kind: 'appear', id: n.id, x: n.x, y: n.y, value: n.value });
-    } else if (p.value !== n.value) {
+    } else if (
+      p.value !== n.value ||
+      (p.origin !== n.origin && (n.origin === 'roll' || n.origin === 'reroll'))
+    ) {
       transitions.push({
         kind: 'change',
         id: n.id,
