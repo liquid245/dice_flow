@@ -1,9 +1,6 @@
-import type { Action } from '../core/actions/types';
-import type { GameState } from '../core/game/state';
+import type { GameEngine } from '../core/game/engine';
 
-export interface InputEngine {
-  dispatch(action: Action): void;
-  beginTransaction(): void;
-  endTransaction(): void;
-  getState(): GameState;
-}
+export type InputEngine = Pick<
+  GameEngine,
+  'dispatch' | 'beginTransaction' | 'endTransaction' | 'getState' | 'random'
+>;

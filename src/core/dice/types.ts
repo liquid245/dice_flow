@@ -8,6 +8,5 @@ export interface Die {
   id: DiceId;
   type: DiceType;
   value: number;
-  selected: boolean;
   origin: OperationKind;
 }

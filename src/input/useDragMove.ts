@@ -4,6 +4,7 @@ import type { InputEngine } from './engine';
 import type { HitTest } from './hitTest';
 import { exceedsThreshold, moveTarget } from './dragMove';
 import { DieGestureController } from './dieGesture';
+import { isDieSelected, selectedDice } from '../core/selection/selection';
 import { config } from '../config';
 
 interface PressState {
@@ -48,7 +49,7 @@ export function useDragMove(
       startValue: die.value,
       startX: event.clientX,
       startY: event.clientY,
-      wasSelected: gameDie?.selected ?? false,
+      wasSelected: gameDie ? isDieSelected(gameDie, engine.getState().selection) : false,
     };
     last.current = { x: event.clientX, y: event.clientY };
     clearTimer();
@@ -103,7 +104,8 @@ export function useDragMove(
     const target = hitTest.groupAt(event.clientX, event.clientY);
     engine.beginTransaction();
     engine.dispatch({ type: 'select', ids: [d.dieId], mode: d.wasSelected ? 'add' : 'set' });
-    const selectedCount = engine.getState().dice.filter((x) => x.selected).length;
+    const g = engine.getState();
+    const selectedCount = selectedDice(g.dice, g.selection).length;
     const action = moveTarget(d.startValue, selectedCount, target);
     if (action) {
       engine.dispatch(action);

@@ -1,9 +1,10 @@
-import type { Action, GameAction } from '../actions/types';
+import type { Action, GameAction, LoggableAction } from '../actions/types';
 import type { HistoryEntry } from '../history/types';
 import type { GameState } from './state';
-import { createInitialState } from './state';
+import { createInitialState, normalizeState } from './state';
 import type { EngineDeps } from './deps';
 import { reduce } from './reducer';
+import { selectedDice } from '../selection/selection';
 
 export interface GameEngine {
   getState(): GameState;
@@ -14,6 +15,7 @@ export interface GameEngine {
   beginTransaction(): void;
   endTransaction(): void;
   restore(state: GameState): void;
+  random(): number;
 }
 
 export function createEngine(deps: EngineDeps, initial: GameState = createInitialState()): GameEngine {
@@ -57,7 +59,7 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
 
     const previous = state;
     state = reduce(state, action, deps);
-    const entry = makeEntry(action, previous, state, deps);
+    const entry = makeEntry(action, previous, deps);
     state = isMod ? mergeModEntry(state, entry) : appendEntry(state, entry);
 
     lastAction = action.type;
@@ -113,26 +115,31 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
       lastAction = null;
     },
     restore(restored: GameState) {
-      state = { ...createInitialState(), ...restored };
+      state = normalizeState(restored);
       undoStack.length = 0;
       redoStack = [];
       lastAction = null;
       notify();
     },
+    random: () => deps.random(),
   };
 }
 
 function selectedCount(state: GameState): number {
-  return state.dice.filter((d) => d.selected).length;
+  return selectedDice(state.dice, state.selection).length;
 }
 
-function makeEntry(action: GameAction, previous: GameState, next: GameState, deps: EngineDeps): HistoryEntry {
+function makeEntry(
+  action: LoggableAction,
+  previous: GameState,
+  deps: EngineDeps,
+): HistoryEntry {
   const base = { id: deps.nextId(), timestamp: deps.now() };
   switch (action.type) {
     case 'roll':
       return { ...base, kind: 'roll', count: selectedCount(previous) };
     case 'reroll': {
-      const selected = previous.dice.filter((d) => d.selected);
+      const selected = selectedDice(previous.dice, previous.selection);
       const targets = selected.length > 0 ? selected : previous.dice;
       const values = new Set(targets.map((d) => d.value));
       return {
@@ -145,17 +152,13 @@ function makeEntry(action: GameAction, previous: GameState, next: GameState, dep
     case 'add':
       return { ...base, kind: 'add', count: action.count };
     case 'delete': {
-      const selected = previous.dice.filter((d) => d.selected);
+      const selected = selectedDice(previous.dice, previous.selection);
       const count =
         selected.length > 0 ? selected.length : Math.min(Math.max(0, action.count ?? 1), previous.dice.length);
       return { ...base, kind: 'delete', count };
     }
     case 'move':
       return { ...base, kind: 'move', count: selectedCount(previous), value: action.targetValue };
-    case 'select':
-      return { ...base, kind: 'select', count: selectedCount(next) };
-    case 'selectGroups':
-      return { ...base, kind: 'select', count: selectedCount(next) };
     case 'clear':
       return { ...base, kind: 'clear', count: previous.dice.length };
   }

@@ -1,5 +1,6 @@
 import { useGame } from '../../app/game';
 import { changesSinceLastRoll } from '../../core/history/selectors';
+import { selectedDice } from '../../core/selection/selection';
 import type { HistoryEntry } from '../../core/history/types';
 import { config } from '../../config';
 
@@ -13,7 +14,7 @@ function formatEntry(entry: HistoryEntry): string {
 
 export function InfoPanel() {
   const { state } = useGame();
-  const selected = state.dice.filter((d) => d.selected).length;
+  const selected = selectedDice(state.dice, state.selection).length;
   const changes = changesSinceLastRoll(state.history);
   const infoPanel = config.ui.infoPanel;
 

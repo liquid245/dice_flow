@@ -13,3 +13,5 @@ export type GameAction =
   | { type: 'clear' };
 
 export type Action = GameAction | { type: 'undo' } | { type: 'redo' };
+
+export type LoggableAction = Exclude<GameAction, { type: 'select' } | { type: 'selectGroups' }>;

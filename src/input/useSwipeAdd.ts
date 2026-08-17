@@ -20,7 +20,7 @@ export function useSwipeAdd(engine: InputEngine, enabled: () => boolean) {
     event.currentTarget.setPointerCapture(event.pointerId);
     engine.beginTransaction();
     gesture.current = {
-      session: new SwipeAddSession(() => rollD6(Math.random)),
+      session: new SwipeAddSession(() => rollD6(engine.random)),
       startY: event.clientY,
       active: true,
     };

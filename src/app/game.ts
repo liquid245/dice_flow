@@ -24,5 +24,6 @@ export function useGame() {
     beginTransaction: engine.beginTransaction,
     endTransaction: engine.endTransaction,
     getState: engine.getState,
+    random: engine.random,
   };
 }

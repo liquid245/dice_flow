@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createEngine } from './engine';
+import { noneSelection, selectedDice } from '../selection/selection';
 import type { EngineDeps } from './deps';
 
 function makeDeps(): EngineDeps {
@@ -50,7 +51,8 @@ describe('engine', () => {
     const engine = createEngine(makeDeps());
     engine.dispatch({ type: 'add', count: 2 });
     engine.dispatch({ type: 'select', ids: ['d1'], mode: 'set' });
-    expect(engine.getState().dice.filter((d) => d.selected)).toHaveLength(1);
+    const s = engine.getState();
+    expect(selectedDice(s.dice, s.selection)).toHaveLength(1);
 
     engine.dispatch({ type: 'undo' });
     expect(engine.getState().dice).toHaveLength(0);
@@ -65,7 +67,8 @@ describe('engine', () => {
     engine.dispatch({ type: 'add', count: 2 });
     engine.dispatch({ type: 'select', ids: ['d1'], mode: 'set' });
 
-    expect(engine.getState().dice.filter((d) => d.selected)).toHaveLength(1);
+    const s0 = engine.getState();
+    expect(selectedDice(s0.dice, s0.selection)).toHaveLength(1);
     expect(engine.getState().history.map((e) => e.kind)).toEqual(['add']);
 
     engine.dispatch({ type: 'undo' });
@@ -77,7 +80,8 @@ describe('engine', () => {
     const engine = createEngine(makeDeps());
     engine.dispatch({ type: 'add', count: 3, values: [1, 2, 3] });
     engine.dispatch({ type: 'selectGroups', min: 1, max: 2 });
-    expect(engine.getState().dice.filter((d) => d.selected)).toHaveLength(2);
+    const s = engine.getState();
+    expect(selectedDice(s.dice, s.selection)).toHaveLength(2);
     expect(engine.getState().history.map((e) => e.kind)).toEqual(['add']);
   });
 
@@ -186,7 +190,7 @@ describe('engine', () => {
     engine.dispatch({ type: 'add', count: 2 });
     expect(engine.canUndo()).toBe(true);
 
-    engine.restore({ dice: [], history: [], swipeAddAvailable: false, rememberedValues: [], selectedGroups: null });
+    engine.restore({ dice: [], history: [], swipeAddAvailable: false, rememberedValues: [], selection: noneSelection });
     expect(engine.getState().dice).toHaveLength(0);
     expect(engine.getState().swipeAddAvailable).toBe(false);
     expect(engine.canUndo()).toBe(false);

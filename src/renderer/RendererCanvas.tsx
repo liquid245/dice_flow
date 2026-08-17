@@ -7,11 +7,12 @@ import { useDragMove } from '../input/useDragMove';
 import { useGroupSwipe } from '../input/useGroupSwipe';
 import { useBackgroundTap } from '../input/useBackgroundTap';
 import { TapCycleController, visualOrder } from '../input/tapCycle';
+import { selectedDice, selectedIds } from '../core/selection/selection';
 import type { HitTest } from '../input/hitTest';
 
 export function RendererCanvas() {
-  const { state, dispatch, beginTransaction, endTransaction, getState } = useGame();
-  const engine = { dispatch, beginTransaction, endTransaction, getState };
+  const { state, dispatch, beginTransaction, endTransaction, getState, random } = useGame();
+  const engine = { dispatch, beginTransaction, endTransaction, getState, random };
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<DiceRenderer | null>(null);
   const cycleRef = useRef(new TapCycleController());
@@ -31,10 +32,9 @@ export function RendererCanvas() {
     const renderer = rendererRef.current;
     if (!renderer) return;
     renderer.sync(state);
-    renderer.render();
   }, [state]);
 
-  const selectedCount = state.dice.filter((d) => d.selected).length;
+  const selectedCount = selectedDice(state.dice, state.selection).length;
   useEffect(() => {
     if (selectedCount === 0) cycleRef.current.reset();
   }, [selectedCount]);
@@ -47,11 +47,11 @@ export function RendererCanvas() {
   };
 
   const swipe = useSwipeAdd(engine, () => state.swipeAddAvailable && state.dice.length === 0);
-  const selectedIds = new Set(state.dice.filter((d) => d.selected).map((d) => d.id));
+  const selected = selectedIds(state.dice, state.selection);
   const drag = useDragMove(
     engine,
     hitTest,
-    (id) => dispatch(cycleRef.current.tap(order, id, selectedIds)),
+    (id) => dispatch(cycleRef.current.tap(order, id, selected)),
     (fromId, toId) => dispatch(cycleRef.current.swipe(order, fromId, toId)),
     (fromId, toId) => {
       if (toId) {

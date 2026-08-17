@@ -3,7 +3,7 @@ import type { Die } from '../core/dice/types';
 import { layout } from './layout';
 
 function die(id: string, value: number): Die {
-  return { id, type: 'd6', value, selected: false, origin: 'add' };
+  return { id, type: 'd6', value, origin: 'add' };
 }
 
 function diceOf(count: number, value: number, prefix = ''): Die[] {

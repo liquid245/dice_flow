@@ -4,7 +4,7 @@ import { config, type ButtonKey } from '../../config';
 
 export function ActionBar() {
   const { state, dispatch, canUndo, canRedo } = useGame();
-  const selectedCount = selectedDice(state.dice).length;
+  const selectedCount = selectedDice(state.dice, state.selection).length;
   const hasDice = state.dice.length > 0;
 
   const isOn = (key: ButtonKey) => config.buttonVisibility[key];

@@ -3,6 +3,7 @@ import { rollD6 } from '../dice/roll';
 import type { GameAction, SelectMode } from '../actions/types';
 import type { GameState } from './state';
 import type { EngineDeps } from './deps';
+import { noneSelection, selectedDice, selectedIds } from '../selection/selection';
 
 export function reduce(state: GameState, action: GameAction, deps: EngineDeps): GameState {
   switch (action.type) {
@@ -22,10 +23,6 @@ export function reduce(state: GameState, action: GameAction, deps: EngineDeps): 
       return selectGroupRange(state, action.min, action.max);
     case 'clear':
       return clear(state);
-    default: {
-      const unreachable: never = action;
-      return unreachable;
-    }
   }
 }
 
@@ -46,21 +43,20 @@ function addDice(state: GameState, count: number, values: number[] | undefined, 
       id: deps.nextId(),
       type: 'd6',
       value,
-      selected: false,
       origin: 'add',
     });
   }
   return {
     ...state,
-    dice: [...state.dice.map((d) => (d.selected ? { ...d, selected: false } : d)), ...added],
+    dice: [...state.dice, ...added],
     swipeAddAvailable: false,
     rememberedValues: memory,
-    selectedGroups: null,
+    selection: noneSelection,
   };
 }
 
 function deleteDice(state: GameState, count: number | undefined): GameState {
-  const selected = state.dice.filter((d) => d.selected);
+  const selected = selectedDice(state.dice, state.selection);
   let deleted: Die[];
   let remaining: Die[];
   if (selected.length > 0) {
@@ -80,70 +76,80 @@ function deleteDice(state: GameState, count: number | undefined): GameState {
     dice: remaining,
     swipeAddAvailable: false,
     rememberedValues: memory,
-    selectedGroups: null,
+    selection: noneSelection,
   };
 }
 
 function roll(state: GameState, deps: EngineDeps): GameState {
-  const selected = state.dice.filter((d) => d.selected);
+  const selected = selectedDice(state.dice, state.selection);
   if (selected.length === 0) return state;
   const ids = new Set(selected.map((d) => d.id));
   const dice: Die[] = state.dice
     .filter((d) => ids.has(d.id))
-    .map((d) => ({ ...d, value: rollD6(deps.random), selected: false, origin: 'roll' }));
-  return { ...state, dice, rememberedValues: [], selectedGroups: null };
+    .map((d) => ({ ...d, value: rollD6(deps.random), origin: 'roll' as const }));
+  return { ...state, dice, rememberedValues: [], selection: noneSelection };
 }
 
 function reroll(state: GameState, deps: EngineDeps): GameState {
-  const selected = state.dice.filter((d) => d.selected);
+  const selected = selectedDice(state.dice, state.selection);
   const ids = new Set(
     (selected.length > 0 ? selected : state.dice).map((d) => d.id),
   );
   if (ids.size === 0) return state;
   const dice: Die[] = state.dice.map((d) =>
-    ids.has(d.id) ? { ...d, value: rollD6(deps.random), selected: false, origin: 'reroll' } : d,
+    ids.has(d.id) ? { ...d, value: rollD6(deps.random), origin: 'reroll' as const } : d,
   );
-  return { ...state, dice, rememberedValues: [], selectedGroups: null };
+  return { ...state, dice, rememberedValues: [], selection: noneSelection };
 }
 
 function move(state: GameState, targetValue: number): GameState {
-  const selected = state.dice.filter((d) => d.selected);
+  const selected = selectedDice(state.dice, state.selection);
   if (selected.length === 0) return state;
   const ids = new Set(selected.map((d) => d.id));
   const dice: Die[] = state.dice.map((d) =>
-    ids.has(d.id) ? { ...d, value: targetValue, selected: false, origin: 'move' } : d,
+    ids.has(d.id) ? { ...d, value: targetValue, origin: 'move' as const } : d,
   );
-  return { ...state, dice, selectedGroups: null };
+  return { ...state, dice, selection: noneSelection };
 }
 
 function select(state: GameState, ids: string[], mode: SelectMode): GameState {
   const idSet = new Set(ids);
-  const dice: Die[] = state.dice.map((d) => {
-    if (mode === 'set') {
-      const selected = idSet.has(d.id);
-      return d.selected === selected ? d : { ...d, selected };
+  const current = selectedIds(state.dice, state.selection);
+  let next: Set<string>;
+  switch (mode) {
+    case 'set':
+      next = new Set(idSet);
+      break;
+    case 'toggle': {
+      next = new Set(current);
+      for (const id of idSet) {
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+      }
+      break;
     }
-    if (!idSet.has(d.id)) return d;
-    if (mode === 'toggle') return { ...d, selected: !d.selected };
-    if (mode === 'add') return d.selected ? d : { ...d, selected: true };
-    return d.selected ? { ...d, selected: false } : d;
-  });
-  return { ...state, dice, selectedGroups: null };
+    case 'add': {
+      next = new Set(current);
+      for (const id of idSet) next.add(id);
+      break;
+    }
+    case 'remove': {
+      next = new Set(current);
+      for (const id of idSet) next.delete(id);
+      break;
+    }
+  }
+  return { ...state, selection: next.size === 0 ? noneSelection : { kind: 'ids', ids: next } };
 }
 
 function selectGroupRange(state: GameState, min: number, max: number): GameState {
   const lo = Math.min(min, max);
   const hi = Math.max(min, max);
-  const groups = state.selectedGroups;
-  let changed = !(groups && groups.min === lo && groups.max === hi);
-  const dice: Die[] = state.dice.map((d) => {
-    const selected = d.value >= lo && d.value <= hi;
-    if (d.selected !== selected) changed = true;
-    return d.selected === selected ? d : { ...d, selected };
-  });
-  return changed ? { ...state, dice, selectedGroups: { min: lo, max: hi } } : state;
+  const selection = state.selection;
+  if (selection.kind === 'range' && selection.min === lo && selection.max === hi) return state;
+  return { ...state, selection: { kind: 'range', min: lo, max: hi } };
 }
 
 function clear(state: GameState): GameState {
-  return { ...state, dice: [], swipeAddAvailable: true, rememberedValues: [], selectedGroups: null };
+  return { ...state, dice: [], swipeAddAvailable: true, rememberedValues: [], selection: noneSelection };
 }

@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPixelatedPass } from 'three/examples/jsm/postprocessing/RenderPixelatedPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import type { RenderPixelatedPass } from 'three/examples/jsm/postprocessing/RenderPixelatedPass.js';
 import type { GameState } from '../core/game/state';
 import type { DiceId, Die } from '../core/dice/types';
+import { isDieSelected } from '../core/selection/selection';
 import { loadDiceModel, type LodGroup } from './dice';
 import { layout, type Layout } from './layout';
 import { computeTransitions, type DieSnapshot, type Transition } from './animator';
@@ -60,6 +60,9 @@ export class DiceRenderer {
   private idSlot = new Map<DiceId, number>();
   private freeSlots: number[] = [];
   private selected = new Set<DiceId>();
+  private selectionSince: number | null = null;
+  private shakeActive = false;
+  private groupsByValue = new Map<number, Die[]>();
 
   private plates = new Map<number, THREE.Mesh>();
   private layout: Layout = { positions: new Map(), bands: [], bounds: { minX: -2, maxX: 2, minY: -1, maxY: 0 } };
@@ -95,6 +98,9 @@ export class DiceRenderer {
   private pos = new THREE.Vector3();
   private scl = new THREE.Vector3();
   private mat = new THREE.Matrix4();
+  private planeZ = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+  private planeHit = new THREE.Vector3();
+  private ndcVec = new THREE.Vector2();
 
   constructor(private container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -125,14 +131,7 @@ export class DiceRenderer {
     this.createPlates();
 
     if (config.renderer.pixelate.enabled) {
-      const pixelate = config.renderer.pixelate;
-      this.pixelPass = new RenderPixelatedPass(pixelate.pixelSize, this.scene, this.camera, {
-        normalEdgeStrength: pixelate.normalEdgeStrength,
-        depthEdgeStrength: pixelate.depthEdgeStrength,
-      });
-      this.composer = new EffectComposer(this.renderer);
-      this.composer.addPass(this.pixelPass);
-      this.composer.addPass(new OutputPass());
+      void this.setupPixelation();
     }
 
     loadDiceModel()
@@ -148,6 +147,24 @@ export class DiceRenderer {
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
     this.resize();
+  }
+
+  private async setupPixelation(): Promise<void> {
+    const [{ EffectComposer }, { RenderPixelatedPass }, { OutputPass }] = await Promise.all([
+      import('three/examples/jsm/postprocessing/EffectComposer.js'),
+      import('three/examples/jsm/postprocessing/RenderPixelatedPass.js'),
+      import('three/examples/jsm/postprocessing/OutputPass.js'),
+    ]);
+    const pixelate = config.renderer.pixelate;
+    this.pixelPass = new RenderPixelatedPass(pixelate.pixelSize, this.scene, this.camera, {
+      normalEdgeStrength: pixelate.normalEdgeStrength,
+      depthEdgeStrength: pixelate.depthEdgeStrength,
+    });
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(this.pixelPass);
+    this.composer.addPass(new OutputPass());
+    this.composer.setSize(this.renderer.domElement.width, this.renderer.domElement.height);
+    this.render();
   }
 
   private createPlates(): void {
@@ -200,12 +217,12 @@ export class DiceRenderer {
   private plateTargetOpacity(value: number): number {
     const plate = config.renderer.plate;
     if (this.dragTarget !== null && value === this.dragTarget) return plate.selectedOpacity;
-    const group = (this.lastState?.dice ?? []).filter((d) => d.value === value);
+    const group = this.groupsByValue.get(value) ?? [];
     if (group.length === 0) {
       return this.groupHighlighted(value) ? plate.selectedOpacity : plate.opacity;
     }
     if (config.renderer.plate.gradient) {
-      const selected = group.filter((d) => d.selected).length;
+      const selected = group.filter((d) => this.selected.has(d.id)).length;
       return plateOpacity(selected, group.length, plate.opacity, plate.selectedOpacity);
     }
     return this.groupHighlighted(value) ? plate.selectedOpacity : plate.opacity;
@@ -262,11 +279,10 @@ export class DiceRenderer {
   }
 
   private groupHighlighted(value: number): boolean {
-    const dice = this.lastState?.dice ?? [];
-    const group = dice.filter((d) => d.value === value);
-    if (group.length > 0) return group.every((d) => d.selected);
-    const range = this.lastState?.selectedGroups;
-    return range != null && value >= range.min && value <= range.max;
+    const group = this.groupsByValue.get(value) ?? [];
+    if (group.length > 0) return group.every((d) => this.selected.has(d.id));
+    const selection = this.lastState?.selection;
+    return selection != null && selection.kind === 'range' && value >= selection.min && value <= selection.max;
   }
 
   get domElement(): HTMLCanvasElement {
@@ -353,6 +369,7 @@ export class DiceRenderer {
 
     const layoutChanged = isInitial || this.layoutChanged(this.lastState?.dice ?? [], state.dice);
     this.lastState = state;
+    this.groupsByValue = groupDice(state.dice);
 
     if (layoutChanged) {
       this.layout = layout(state.dice, this.maxPerRow, this.aspect);
@@ -393,7 +410,7 @@ export class DiceRenderer {
       }
     }
 
-    if (this.selected.size > 0) this.ensureLoop();
+    if (this.shakeActive) this.ensureLoop();
     this.render();
   }
 
@@ -617,11 +634,19 @@ export class DiceRenderer {
     for (const die of state.dice) {
       const slot = this.idSlot.get(die.id);
       if (slot == null) continue;
-      this.slots[slot].selected = die.selected;
-      if (die.selected) next.add(die.id);
+      const isSelected = isDieSelected(die, state.selection);
+      this.slots[slot].selected = isSelected;
+      if (isSelected) next.add(die.id);
     }
     const changed = prev.size !== next.size || ![...prev].every((id) => next.has(id));
     this.selected = next;
+    if (changed) {
+      if (prev.size === 0 && next.size > 0) this.selectionSince = performance.now();
+      else if (next.size === 0) {
+        this.selectionSince = null;
+        this.shakeActive = false;
+      }
+    }
     return changed;
   }
 
@@ -639,11 +664,19 @@ export class DiceRenderer {
   }
 
   private applyShake(now: number): void {
-    if (this.selected.size === 0) return;
-    for (const id of this.selected) {
-      const slot = this.idSlot.get(id);
-      if (slot == null || this.tweenIds.has(id)) continue;
-      this.writeMatrix(slot, now);
+    const duration = config.renderer.shake.durationMs;
+    const shaking =
+      this.selected.size > 0 &&
+      this.selectionSince != null &&
+      (duration <= 0 || now - this.selectionSince < duration);
+
+    if (shaking || shaking !== this.shakeActive) {
+      this.shakeActive = shaking;
+      for (const id of this.selected) {
+        const slot = this.idSlot.get(id);
+        if (slot == null || this.tweenIds.has(id)) continue;
+        this.writeMatrix(slot, now);
+      }
     }
   }
 
@@ -659,7 +692,7 @@ export class DiceRenderer {
       this.qB.multiplyQuaternions(this.qA, face);
       orientation = this.qB;
     }
-    if (die.selected) {
+    if (die.selected && this.shakeActive) {
       const t = now / 1000;
       const shake = config.renderer.shake;
       const phase = die.shakePhase;
@@ -808,10 +841,8 @@ export class DiceRenderer {
 
   private cursorWorld(clientX: number, clientY: number): { x: number; y: number } | null {
     this.raycaster.setFromCamera(this.ndc(clientX, clientY), this.camera);
-    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-    const target = new THREE.Vector3();
-    if (!this.raycaster.ray.intersectPlane(plane, target)) return null;
-    return { x: target.x, y: target.y };
+    if (!this.raycaster.ray.intersectPlane(this.planeZ, this.planeHit)) return null;
+    return { x: this.planeHit.x, y: this.planeHit.y };
   }
 
   private ensureLoop(): void {
@@ -825,7 +856,7 @@ export class DiceRenderer {
     const scaling = this.stepScaleFade(now);
     this.render();
 
-    const active = this.tweens.length > 0 || this.selected.size > 0 || fading || scaling;
+    const active = this.tweens.length > 0 || this.shakeActive || fading || scaling;
     this.rafId = active ? requestAnimationFrame(this.tick) : null;
   };
 
@@ -854,9 +885,8 @@ export class DiceRenderer {
   groupAt(clientX: number, clientY: number): number | undefined {
     if (!this.hasDice) return undefined;
     this.raycaster.setFromCamera(this.ndc(clientX, clientY), this.camera);
-    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-    const target = new THREE.Vector3();
-    if (!this.raycaster.ray.intersectPlane(plane, target)) return undefined;
+    if (!this.raycaster.ray.intersectPlane(this.planeZ, this.planeHit)) return undefined;
+    const target = this.planeHit;
     const halfWidth =
       (this.layout.bounds.maxX - this.layout.bounds.minX) / 2 +
       config.renderer.plate.horizontalPadding;
@@ -869,7 +899,7 @@ export class DiceRenderer {
 
   private ndc(clientX: number, clientY: number): THREE.Vector2 {
     const rect = this.domElement.getBoundingClientRect();
-    return new THREE.Vector2(
+    return this.ndcVec.set(
       ((clientX - rect.left) / rect.width) * 2 - 1,
       -((clientY - rect.top) / rect.height) * 2 + 1,
     );
@@ -885,6 +915,16 @@ export class DiceRenderer {
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
+}
+
+function groupDice(dice: Die[]): Map<number, Die[]> {
+  const groups = new Map<number, Die[]>();
+  for (const die of dice) {
+    const group = groups.get(die.value);
+    if (group) group.push(die);
+    else groups.set(die.value, [die]);
+  }
+  return groups;
 }
 
 function createRoundedRectGeometry(width: number, height: number, radius: number): THREE.ShapeGeometry {

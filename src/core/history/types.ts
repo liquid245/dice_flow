@@ -1,4 +1,4 @@
-export type HistoryKind = 'roll' | 'reroll' | 'add' | 'delete' | 'move' | 'select' | 'clear';
+export type HistoryKind = 'roll' | 'reroll' | 'add' | 'delete' | 'move' | 'clear';
 
 export interface HistoryEntry {
   id: string;
