@@ -112,4 +112,13 @@ export const config = {
       valuePrefix: ':',
     },
   },
+  vibration: {
+    enabled: true,
+    patterns: {
+      roll: [40, 30, 40],
+      select: 15,
+      delete: 60,
+      add: 20,
+    },
+  },
 };

@@ -10,6 +10,7 @@ import { computeTransitions, type DieSnapshot, type Transition } from './animato
 import type { DieHit } from '../input/hitTest';
 import { config } from '../config';
 import { playSound, type SoundName } from '../services/audio';
+import { vibrate, type VibrationName } from '../services/vibration';
 import { plateOpacity } from './plateOpacity';
 
 type Tween =
@@ -338,7 +339,11 @@ export class DiceRenderer {
       }
     }
 
-    this.reconcileSelection(state);
+    const selectionChanged = this.reconcileSelection(state);
+
+    if (selectionChanged && !layoutChanged && !isInitial && this.selected.size > 0) {
+      vibrate('select');
+    }
 
     const now = performance.now();
     this.writeStaticMatrices(now);
@@ -445,6 +450,15 @@ export class DiceRenderer {
       }
       for (const sound of sounds) playSound(sound);
     }
+
+    const vibrations = new Set<VibrationName>();
+    for (const transition of transitions) {
+      if (transition.kind === 'appear') vibrations.add('add');
+      else if (transition.kind === 'remove') vibrations.add('delete');
+      else if (transition.kind === 'change' && (transition.origin === 'roll' || transition.origin === 'reroll'))
+        vibrations.add('roll');
+    }
+    for (const vibration of vibrations) vibrate(vibration);
 
     const tweens: Tween[] = [];
     for (const transition of transitions) {
@@ -568,14 +582,18 @@ export class DiceRenderer {
     this.tweenIds.clear();
   }
 
-  private reconcileSelection(state: GameState): void {
-    this.selected.clear();
+  private reconcileSelection(state: GameState): boolean {
+    const prev = this.selected;
+    const next = new Set<DiceId>();
     for (const die of state.dice) {
       const slot = this.idSlot.get(die.id);
       if (slot == null) continue;
       this.slots[slot].selected = die.selected;
-      if (die.selected) this.selected.add(die.id);
+      if (die.selected) next.add(die.id);
     }
+    const changed = prev.size !== next.size || ![...prev].every((id) => next.has(id));
+    this.selected = next;
+    return changed;
   }
 
   private writeStaticMatrices(now: number): void {
