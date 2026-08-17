@@ -68,6 +68,16 @@ describe('layout', () => {
     expect(yLevels(positions)).toBe(20);
   });
 
+  it('treats maxPerRow 0 as no cap', () => {
+    const { positions } = layout(diceOf(9, 6), 0, 1);
+    expect(rowCounts(positions)).toEqual([3, 3, 3]);
+  });
+
+  it('respects a low maxPerRow cap', () => {
+    const { positions } = layout(diceOf(9, 6), 2, 1);
+    expect(rowCounts(positions)).toEqual([2, 2, 2, 2, 1]);
+  });
+
   it('emits a band per group even when empty', () => {
     const { bands, bounds } = layout([], 20, 1);
     expect(bands).toHaveLength(6);

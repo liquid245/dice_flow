@@ -50,12 +50,29 @@ function heightFor(rows: number): number {
 
 function columnOptions(count: number, maxPerRow: number): ColumnOption[] {
   const options: ColumnOption[] = [];
-  const maxCols = Math.min(count, maxPerRow);
+  // maxPerRow <= 0 means no upper bound on columns per row.
+  const maxCols = maxPerRow <= 0 ? count : Math.min(count, maxPerRow);
   for (let cols = 1; cols <= maxCols; cols++) {
     const rows = Math.ceil(count / cols);
     options.push({ cols, width: widthFor(count, rows), height: heightFor(rows) });
   }
   return options;
+}
+
+function pickForWidth(options: ColumnOption[], width: number): ColumnOption | null {
+  let lo = 0;
+  let hi = options.length - 1;
+  let found = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (options[mid].width <= width) {
+      found = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return found >= 0 ? options[found] : null;
 }
 
 function chooseColumns(counts: number[], options: (ColumnOption[] | null)[], aspect: number): number[] {
@@ -79,10 +96,7 @@ function chooseColumns(counts: number[], options: (ColumnOption[] | null)[], asp
       let feasible = true;
 
       for (let gi = 0; gi < groups.length; gi++) {
-        let pick: ColumnOption | null = null;
-        for (const option of groups[gi].options) {
-          if (option.width <= width) pick = option;
-        }
+        const pick = pickForWidth(groups[gi].options, width);
         if (!pick) {
           feasible = false;
           break;
