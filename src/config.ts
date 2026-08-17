@@ -1,5 +1,7 @@
 type DiceFaceRotation = [number, number, number];
 
+const base = import.meta.env.BASE_URL || '/';
+
 export type ButtonKey = 'roll' | 'reroll' | 'add' | 'delete' | 'undo' | 'redo' | 'clear';
 
 const buttons: Record<ButtonKey, string> = {
@@ -75,11 +77,11 @@ export const config = {
   },
   assets: {
     sounds: {
-      appear: '/sounds/850097__lbrady240__pop11.wav',
-      roll: '/sounds/629982__flem0527__dice-rolling-on-table.wav',
-      disappear: '/sounds/poof.wav',
+      appear: `${base}sounds/850097__lbrady240__pop11.wav`,
+      roll: `${base}sounds/629982__flem0527__dice-rolling-on-table.wav`,
+      disappear: `${base}sounds/poof.wav`,
     },
-    diceModel: '/models/dice.glb',
+    diceModel: `${base}models/dice.glb`,
     diceFaces,
   },
   buttons,
