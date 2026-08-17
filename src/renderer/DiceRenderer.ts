@@ -1,29 +1,44 @@
 import * as THREE from 'three';
 import type { GameState } from '../core/game/state';
 import type { DiceId, Die } from '../core/dice/types';
-import { createD6Mesh, setD6Value, loadDiceModel, hasDiceModel } from './dice';
+import { loadDiceModel, type DiceModel, type LodGroup } from './dice';
 import { layout, type Layout } from './layout';
-import { computeTransitions, controlsRotation, type DieSnapshot, type Transition } from './animator';
+import { computeTransitions, type DieSnapshot, type Transition } from './animator';
 import type { DieHit } from '../input/hitTest';
 import { config } from '../config';
 import { playSound, type SoundName } from '../services/audio';
 import { plateOpacity } from './plateOpacity';
+import { qualityTier, lodLevelFor, adaptivePixelRatio } from './quality';
 
 type Tween =
-  | { kind: 'appear'; mesh: THREE.Object3D }
-  | { kind: 'remove'; mesh: THREE.Object3D }
-  | { kind: 'slide'; mesh: THREE.Object3D; fromX: number; fromY: number; toX: number; toY: number }
+  | { kind: 'appear'; id: DiceId }
+  | { kind: 'remove'; id: DiceId }
+  | { kind: 'slide'; id: DiceId; fromX: number; fromY: number; toX: number; toY: number }
   | {
       kind: 'change';
-      mesh: THREE.Object3D;
+      id: DiceId;
       fromX: number;
       fromY: number;
       toX: number;
       toY: number;
+      fromValue: number;
       toValue: number;
       valueApplied: boolean;
       spin: boolean;
     };
+
+interface DieInstance {
+  id: DiceId;
+  value: number;
+  x: number;
+  y: number;
+  scale: number;
+  selected: boolean;
+  shakePhase: number;
+  dying: boolean;
+}
+
+const DEFAULT_CAPACITY = 512;
 
 export class DiceRenderer {
   private renderer: THREE.WebGLRenderer;
@@ -31,27 +46,50 @@ export class DiceRenderer {
   private camera: THREE.OrthographicCamera;
   private raycaster = new THREE.Raycaster();
   private resizeObserver: ResizeObserver;
-  private meshes = new Map<DiceId, THREE.Object3D>();
-  private selected = new Set<THREE.Object3D>();
+  private model: DiceModel | null = null;
+  private materialGroups: LodGroup[] = [];
+  private instanced: THREE.InstancedMesh[] = [];
+  private capacity = DEFAULT_CAPACITY;
+  private currentLod = 0;
+  private lodPending = false;
+  private ready = false;
+
+  private slots: DieInstance[] = [];
+  private idSlot = new Map<DiceId, number>();
+  private freeSlots: number[] = [];
+  private selected = new Set<DiceId>();
+
   private plates = new Map<number, THREE.Mesh>();
   private layout: Layout = { positions: new Map(), bands: [], bounds: { minX: -2, maxX: 2, minY: -1, maxY: 0 } };
   private lastState: GameState | null = null;
   private maxPerRow = 6;
   private prev: DieSnapshot[] = [];
   private tweens: Tween[] = [];
-  private tweenMeshes = new Set<THREE.Object3D>();
+  private tweenIds = new Set<DiceId>();
   private tweenStart = 0;
   private rafId: number | null = null;
   private hasDice = false;
   private synced = false;
+  private dirty = false;
+
   private dragId: DiceId | null = null;
   private dragSolo = false;
   private dragOffsets = new Map<DiceId, { x: number; y: number }>();
   private dragCursor: { x: number; y: number } | null = null;
   private dragTarget: number | null = null;
   private pendingDragReset = new Set<DiceId>();
+
   private plateTargets = new Map<number, number>();
   private plateFades = new Map<number, { from: number; start: number }>();
+
+  private faceQuats: THREE.Quaternion[] = [];
+  private qIdentity = new THREE.Quaternion();
+  private qA = new THREE.Quaternion();
+  private qB = new THREE.Quaternion();
+  private eul = new THREE.Euler();
+  private pos = new THREE.Vector3();
+  private scl = new THREE.Vector3();
+  private mat = new THREE.Matrix4();
 
   constructor(private container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -73,10 +111,23 @@ export class DiceRenderer {
     key.position.set(5, 5, 10);
     this.scene.add(key);
 
+    for (let value = 1; value <= 6; value++) {
+      const [x, y, z] = config.assets.diceFaces[value];
+      this.eul.set(x, y, z);
+      this.faceQuats[value] = new THREE.Quaternion().setFromEuler(this.eul);
+    }
+
     this.createPlates();
 
-    loadDiceModel(config.assets.diceModel)
-      .then(() => {
+    loadDiceModel()
+      .then((model) => {
+        this.model = model;
+        return model.loadLod(0);
+      })
+      .then((lod) => {
+        this.materialGroups = lod.groups;
+        this.applyLod();
+        this.ready = true;
         if (this.lastState) this.sync(this.lastState);
       })
       .catch((error) => console.error('Failed to load dice model', error));
@@ -199,14 +250,21 @@ export class DiceRenderer {
   private relayout(): void {
     const dice = this.lastState ? this.lastState.dice : [];
     this.layout = layout(dice, this.maxPerRow, this.aspect);
-    for (const mesh of this.meshes.values()) {
-      const position = this.layout.positions.get(mesh.userData.dieId as string);
-      if (position) mesh.position.set(position.x, position.y, 0);
+    const now = performance.now();
+    for (const die of dice) {
+      const slot = this.idSlot.get(die.id);
+      if (slot == null) continue;
+      const position = this.layout.positions.get(die.id);
+      if (position) {
+        this.slots[slot].x = position.x;
+        this.slots[slot].y = position.y;
+      }
     }
     this.prev = this.synced && this.lastState ? this.snapshots(this.lastState) : [];
     this.updatePlateGeometry();
     this.updatePlateHighlights();
     this.fitCamera();
+    this.writeStaticMatrices(now);
   }
 
   private fitCamera(): void {
@@ -240,7 +298,7 @@ export class DiceRenderer {
   }
 
   sync(state: GameState): void {
-    if (!hasDiceModel()) {
+    if (!this.ready) {
       this.lastState = state;
       return;
     }
@@ -263,36 +321,27 @@ export class DiceRenderer {
       this.prev = next;
       this.updatePlateGeometry();
       this.fitCamera();
-      if (!isInitial && transitions.length > 0) this.animate(transitions, true);
-    }
-
-    this.selected.clear();
-    for (const die of state.dice) {
-      const mesh = this.ensureMesh(die.id, die.value);
-      if (die.selected) this.selected.add(mesh);
-    }
-
-    if (isInitial) {
-      for (const mesh of this.meshes.values()) {
-        const position = this.layout.positions.get(mesh.userData.dieId as string);
-        if (position) mesh.position.set(position.x, position.y, 0);
-        mesh.scale.setScalar(1);
+      if (isInitial) {
+        this.populateInitial(state);
+      } else if (transitions.length > 0) {
+        this.animate(transitions, true);
       }
     }
 
-    for (const mesh of this.meshes.values()) {
-      if (!this.selected.has(mesh) && !this.isRotationTweened(mesh)) {
-        this.animTarget(mesh).rotation.set(0, 0, 0);
-      }
-    }
+    this.reconcileSelection(state);
 
+    const now = performance.now();
+    this.writeStaticMatrices(now);
+    this.applyShake(now);
+
+    this.applyQuality(state.dice.length);
     this.applyGrabbedScale();
     this.updatePlateHighlights();
     this.resetPendingDrag();
 
     if (dragId) {
-      const mesh = this.meshes.get(dragId);
-      if (mesh && !this.tweenMeshes.has(mesh)) {
+      const slot = this.idSlot.get(dragId);
+      if (slot != null && !this.tweenIds.has(dragId)) {
         this.dragSolo = dragSolo;
         this.beginDrag(dragId);
         this.dragCursor = dragCursor;
@@ -305,15 +354,18 @@ export class DiceRenderer {
     this.render();
   }
 
+  private populateInitial(state: GameState): void {
+    for (const die of state.dice) {
+      const position = this.layout.positions.get(die.id);
+      const slot = this.allocateSlot(die.id, die.value, position?.x ?? 0, position?.y ?? 0);
+      this.slots[slot].scale = 1;
+    }
+  }
+
   private layoutChanged(prev: Die[], next: Die[]): boolean {
     if (prev.length !== next.length) return true;
     for (let i = 0; i < prev.length; i++) {
-      if (
-        prev[i].id !== next[i].id ||
-        prev[i].value !== next[i].value ||
-        prev[i].origin !== next[i].origin
-      )
-        return true;
+      if (prev[i].id !== next[i].id || prev[i].value !== next[i].value || prev[i].origin !== next[i].origin) return true;
     }
     return false;
   }
@@ -331,21 +383,78 @@ export class DiceRenderer {
     });
   }
 
-  private ensureMesh(id: DiceId, value: number): THREE.Object3D {
-    let mesh = this.meshes.get(id);
-    if (!mesh) {
-      mesh = createD6Mesh(value);
-      mesh.userData.dieId = id;
-      mesh.userData.value = value;
-      mesh.userData.shakePhase = Math.random() * Math.PI * 2;
-      this.meshes.set(id, mesh);
-      this.scene.add(mesh);
+  private allocateSlot(id: DiceId, value: number, x: number, y: number): number {
+    let slot = this.freeSlots.pop();
+    if (slot == null) {
+      slot = this.slots.length;
+      this.slots.push({ id, value, x, y, scale: 1, selected: false, shakePhase: Math.random() * Math.PI * 2, dying: false });
+      this.ensureCapacity(this.slots.length);
+      this.syncInstanceCount();
+    } else {
+      this.slots[slot] = { id, value, x, y, scale: 1, selected: false, shakePhase: Math.random() * Math.PI * 2, dying: false };
     }
-    return mesh;
+    this.idSlot.set(id, slot);
+    return slot;
   }
 
-  private animTarget(mesh: THREE.Object3D): THREE.Object3D {
-    return (mesh.userData.anim as THREE.Object3D) ?? mesh;
+  private syncInstanceCount(): void {
+    for (const mesh of this.instanced) mesh.count = this.slots.length;
+  }
+
+  private ensureCapacity(n: number): void {
+    if (n <= this.capacity) return;
+    this.capacity = Math.max(n, this.capacity * 2);
+    this.rebuildInstanced();
+    this.writeAllMatrices(performance.now());
+  }
+
+  private rebuildInstanced(): void {
+    for (const mesh of this.instanced) {
+      this.scene.remove(mesh);
+      mesh.dispose();
+    }
+    this.instanced = [];
+    for (const group of this.materialGroups) {
+      const mesh = new THREE.InstancedMesh(group.geometry, group.material, Math.max(this.capacity, 1));
+      mesh.count = this.slots.length;
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      mesh.frustumCulled = false;
+      this.instanced.push(mesh);
+      this.scene.add(mesh);
+    }
+    this.dirty = true;
+  }
+
+  private applyLod(): void {
+    this.rebuildInstanced();
+    this.writeAllMatrices(performance.now());
+  }
+
+  private applyQuality(diceCount: number): void {
+    if (!this.model) return;
+    const tier = qualityTier(diceCount, config.renderer.quality);
+    const lod = lodLevelFor(tier, this.model.lodCount);
+    if (lod !== this.currentLod && !this.lodPending) {
+      this.currentLod = lod;
+      this.lodPending = true;
+      this.model
+        .loadLod(lod)
+        .then((level) => {
+          this.lodPending = false;
+          if (lod !== this.currentLod) return;
+          this.materialGroups = level.groups;
+          this.applyLod();
+          this.render();
+        })
+        .catch(() => {
+          this.lodPending = false;
+        });
+    }
+    const ratio = adaptivePixelRatio(tier, window.devicePixelRatio || 1);
+    if (Math.abs(ratio - this.renderer.getPixelRatio()) > 0.001) {
+      this.renderer.setPixelRatio(ratio);
+      this.renderer.setSize(this.container.clientWidth || 1, this.container.clientHeight || 1, false);
+    }
   }
 
   private animate(transitions: Transition[], playAudio: boolean): void {
@@ -363,34 +472,41 @@ export class DiceRenderer {
     const tweens: Tween[] = [];
     for (const transition of transitions) {
       if (transition.kind === 'appear') {
-        const mesh = this.ensureMesh(transition.id, transition.value);
-        mesh.position.set(transition.x, transition.y, 0);
-        mesh.scale.setScalar(0);
-        tweens.push({ kind: 'appear', mesh });
+        const slot = this.allocateSlot(transition.id, transition.value, transition.x, transition.y);
+        this.slots[slot].scale = 0;
+        tweens.push({ kind: 'appear', id: transition.id });
       } else if (transition.kind === 'remove') {
-        const mesh = this.meshes.get(transition.id);
-        if (mesh) tweens.push({ kind: 'remove', mesh });
+        const slot = this.idSlot.get(transition.id);
+        if (slot == null) continue;
+        this.slots[slot].dying = true;
+        tweens.push({ kind: 'remove', id: transition.id });
       } else if (transition.kind === 'slide') {
-        const mesh = this.meshes.get(transition.id);
-        if (!mesh) continue;
+        const slot = this.idSlot.get(transition.id);
+        if (slot == null) continue;
+        const die = this.slots[slot];
         tweens.push({
           kind: 'slide',
-          mesh,
-          fromX: mesh.position.x,
-          fromY: mesh.position.y,
+          id: transition.id,
+          fromX: die.x,
+          fromY: die.y,
           toX: transition.toX,
           toY: transition.toY,
         });
       } else {
-        const mesh = this.ensureMesh(transition.id, transition.fromValue);
-        setD6Value(mesh, transition.fromValue);
+        let slot = this.idSlot.get(transition.id);
+        if (slot == null) slot = this.allocateSlot(transition.id, transition.fromValue, transition.fromX, transition.fromY);
+        const die = this.slots[slot];
+        die.value = transition.fromValue;
+        die.x = transition.fromX;
+        die.y = transition.fromY;
         tweens.push({
           kind: 'change',
-          mesh,
-          fromX: mesh.position.x,
-          fromY: mesh.position.y,
+          id: transition.id,
+          fromX: transition.fromX,
+          fromY: transition.fromY,
           toX: transition.toX,
           toY: transition.toY,
+          fromValue: transition.fromValue,
           toValue: transition.toValue,
           valueApplied: false,
           spin: transition.origin === 'roll' || transition.origin === 'reroll',
@@ -398,10 +514,10 @@ export class DiceRenderer {
       }
     }
 
-    for (const tween of tweens) this.tweenMeshes.add(tween.mesh);
+    for (const tween of tweens) this.tweenIds.add(tween.id);
     this.tweens = tweens;
     this.tweenStart = performance.now();
-    this.ensureLoop();
+    if (this.tweens.length > 0) this.ensureLoop();
   }
 
   private stepTweens(now: number): void {
@@ -410,24 +526,26 @@ export class DiceRenderer {
     const e = 1 - Math.pow(1 - t, 3);
 
     for (const tween of this.tweens) {
+      const slot = this.idSlot.get(tween.id);
+      if (slot == null) continue;
+      const die = this.slots[slot];
       if (tween.kind === 'appear') {
-        tween.mesh.scale.setScalar(e);
-        this.animTarget(tween.mesh).rotation.x = e * Math.PI * 2;
-        this.animTarget(tween.mesh).rotation.y = e * Math.PI * 2;
+        die.scale = e;
+        this.writeMatrix(slot, now, e * Math.PI * 2, e * Math.PI * 2);
       } else if (tween.kind === 'remove') {
-        tween.mesh.scale.setScalar(1 - e);
+        die.scale = 1 - e;
+        this.writeMatrix(slot, now);
       } else if (tween.kind === 'slide') {
-        tween.mesh.position.x = tween.fromX + (tween.toX - tween.fromX) * e;
-        tween.mesh.position.y = tween.fromY + (tween.toY - tween.fromY) * e;
+        die.x = tween.fromX + (tween.toX - tween.fromX) * e;
+        die.y = tween.fromY + (tween.toY - tween.fromY) * e;
+        this.writeMatrix(slot, now);
       } else {
-        tween.mesh.position.x = tween.fromX + (tween.toX - tween.fromX) * e;
-        tween.mesh.position.y = tween.fromY + (tween.toY - tween.fromY) * e;
-        if (tween.spin) {
-          this.animTarget(tween.mesh).rotation.x = e * Math.PI * 2;
-          this.animTarget(tween.mesh).rotation.y = e * Math.PI * 2;
-        }
+        die.x = tween.fromX + (tween.toX - tween.fromX) * e;
+        die.y = tween.fromY + (tween.toY - tween.fromY) * e;
+        if (tween.spin) this.writeMatrix(slot, now, e * Math.PI * 2, e * Math.PI * 2);
+        else this.writeMatrix(slot, now);
         if (!tween.valueApplied && t >= 0.5) {
-          setD6Value(tween.mesh, tween.toValue);
+          die.value = tween.toValue;
           tween.valueApplied = true;
         }
       }
@@ -437,37 +555,102 @@ export class DiceRenderer {
   }
 
   private finalizeAnimation(): void {
+    const now = performance.now();
     for (const tween of this.tweens) {
+      const slot = this.idSlot.get(tween.id);
       if (tween.kind === 'appear') {
-        tween.mesh.scale.setScalar(1);
-        this.animTarget(tween.mesh).rotation.set(0, 0, 0);
+        if (slot == null) continue;
+        this.slots[slot].scale = 1;
+        this.writeMatrix(slot, now);
       } else if (tween.kind === 'remove') {
-        this.scene.remove(tween.mesh);
-        this.meshes.delete(tween.mesh.userData.dieId as string);
+        if (slot == null) continue;
+        const die = this.slots[slot];
+        die.scale = 0;
+        die.dying = false;
+        die.selected = false;
+        this.idSlot.delete(tween.id);
+        this.freeSlots.push(slot);
+        this.writeMatrix(slot, now);
       } else if (tween.kind === 'slide') {
-        tween.mesh.position.set(tween.toX, tween.toY, 0);
+        if (slot == null) continue;
+        const die = this.slots[slot];
+        die.x = tween.toX;
+        die.y = tween.toY;
+        this.writeMatrix(slot, now);
       } else {
-        tween.mesh.position.set(tween.toX, tween.toY, 0);
-        this.animTarget(tween.mesh).rotation.set(0, 0, 0);
-        setD6Value(tween.mesh, tween.toValue);
-        tween.mesh.userData.value = tween.toValue;
+        if (slot == null) continue;
+        const die = this.slots[slot];
+        die.x = tween.toX;
+        die.y = tween.toY;
+        die.value = tween.toValue;
+        die.scale = 1;
+        this.writeMatrix(slot, now);
       }
     }
     this.tweens = [];
-    this.tweenMeshes.clear();
+    this.tweenIds.clear();
+  }
+
+  private reconcileSelection(state: GameState): void {
+    this.selected.clear();
+    for (const die of state.dice) {
+      const slot = this.idSlot.get(die.id);
+      if (slot == null) continue;
+      this.slots[slot].selected = die.selected;
+      if (die.selected) this.selected.add(die.id);
+    }
+  }
+
+  private writeStaticMatrices(now: number): void {
+    for (let i = 0; i < this.slots.length; i++) {
+      const die = this.slots[i];
+      if (die.selected || this.tweenIds.has(die.id)) continue;
+      this.writeMatrix(i, now);
+    }
+  }
+
+  private writeAllMatrices(now: number): void {
+    for (let i = 0; i < this.slots.length; i++) this.writeMatrix(i, now);
   }
 
   private applyShake(now: number): void {
     if (this.selected.size === 0) return;
-    const t = now / 1000;
-    const shake = config.renderer.shake;
-    for (const mesh of this.selected) {
-      if (this.tweenMeshes.has(mesh)) continue;
-      const phase = (mesh.userData.shakePhase as number) ?? 0;
-      const anim = this.animTarget(mesh);
-      anim.rotation.z = Math.sin(t * shake.zFrequency + phase) * shake.zAmplitude;
-      anim.rotation.x = Math.sin(t * shake.xFrequency + phase * shake.xPhaseShift) * shake.xAmplitude;
+    for (const id of this.selected) {
+      const slot = this.idSlot.get(id);
+      if (slot == null || this.tweenIds.has(id)) continue;
+      this.writeMatrix(slot, now);
     }
+  }
+
+  private writeMatrix(slot: number, now: number, spinX = 0, spinY = 0): void {
+    const die = this.slots[slot];
+    const face = this.faceQuats[die.value] ?? this.qIdentity;
+    this.pos.set(die.x, die.y, 0);
+
+    let orientation = face;
+    if (spinX !== 0 || spinY !== 0) {
+      this.eul.set(spinX, spinY, 0);
+      this.qA.setFromEuler(this.eul);
+      this.qB.multiplyQuaternions(this.qA, face);
+      orientation = this.qB;
+    }
+    if (die.selected) {
+      const t = now / 1000;
+      const shake = config.renderer.shake;
+      const phase = die.shakePhase;
+      const sx = Math.sin(t * shake.xFrequency + phase * shake.xPhaseShift) * shake.xAmplitude;
+      const sz = Math.sin(t * shake.zFrequency + phase) * shake.zAmplitude;
+      this.eul.set(sx, 0, sz);
+      this.qA.setFromEuler(this.eul);
+      this.qB.multiplyQuaternions(this.qA, orientation);
+      orientation = this.qB;
+    }
+
+    const s = die.scale;
+    this.scl.set(s, s, s);
+    this.mat.compose(this.pos, orientation, this.scl);
+    for (const mesh of this.instanced) mesh.setMatrixAt(slot, this.mat);
+    this.dirty = true;
   }
 
   setDrag(drag: { id: DiceId; x: number; y: number; solo?: boolean; target?: number } | null): void {
@@ -508,27 +691,35 @@ export class DiceRenderer {
       return this.dragId ? [this.dragId] : [];
     }
     const ids: DiceId[] = [];
-    for (const [id, mesh] of this.meshes) {
-      if (id === this.dragId || this.selected.has(mesh)) ids.push(id);
+    for (const id of this.idSlot.keys()) {
+      if (id === this.dragId || this.selected.has(id)) ids.push(id);
     }
     return ids;
   }
 
   private applyDragPositions(): void {
     if (!this.dragCursor) return;
-    for (const [id, mesh] of this.meshes) {
-      const offset = this.dragOffsets.get(id);
-      if (!offset) continue;
-      mesh.position.x = this.dragCursor.x + offset.x;
-      mesh.position.y = this.dragCursor.y + offset.y;
+    const now = performance.now();
+    for (const [id, offset] of this.dragOffsets) {
+      const slot = this.idSlot.get(id);
+      if (slot == null) continue;
+      const die = this.slots[slot];
+      die.x = this.dragCursor.x + offset.x;
+      die.y = this.dragCursor.y + offset.y;
+      this.writeMatrix(slot, now);
     }
   }
 
   private endDrag(): void {
+    const now = performance.now();
     for (const id of this.dragOffsets.keys()) {
-      const mesh = this.meshes.get(id);
+      const slot = this.idSlot.get(id);
       const position = this.layout.positions.get(id);
-      if (mesh && position) mesh.position.set(position.x, position.y, 0);
+      if (slot != null && position) {
+        this.slots[slot].x = position.x;
+        this.slots[slot].y = position.y;
+        this.writeMatrix(slot, now);
+      }
     }
     this.dragId = null;
     this.dragOffsets.clear();
@@ -550,32 +741,31 @@ export class DiceRenderer {
   }
 
   private resetPendingDrag(): void {
+    const now = performance.now();
     for (const id of this.pendingDragReset) {
-      const mesh = this.meshes.get(id);
-      if (!mesh || this.tweenMeshes.has(mesh)) continue;
+      const slot = this.idSlot.get(id);
+      if (slot == null || this.tweenIds.has(id)) continue;
       const position = this.layout.positions.get(id);
-      if (position) mesh.position.set(position.x, position.y, 0);
+      if (position) {
+        this.slots[slot].x = position.x;
+        this.slots[slot].y = position.y;
+        this.writeMatrix(slot, now);
+      }
     }
     this.pendingDragReset.clear();
   }
 
   private applyGrabbedScale(): void {
-    for (const [id, mesh] of this.meshes) {
-      if (this.isScaleTweened(mesh)) continue;
-      mesh.scale.setScalar(this.dragOffsets.has(id) ? config.renderer.grabScale : 1);
+    const now = performance.now();
+    for (let i = 0; i < this.slots.length; i++) {
+      const die = this.slots[i];
+      if (this.tweenIds.has(die.id)) continue;
+      const scale = this.dragOffsets.has(die.id) ? config.renderer.grabScale : 1;
+      if (die.scale !== scale) {
+        die.scale = scale;
+        this.writeMatrix(i, now);
+      }
     }
-  }
-
-  private isScaleTweened(mesh: THREE.Object3D): boolean {
-    return this.tweens.some(
-      (tween) => tween.mesh === mesh && (tween.kind === 'appear' || tween.kind === 'remove'),
-    );
-  }
-
-  private isRotationTweened(mesh: THREE.Object3D): boolean {
-    return this.tweens.some(
-      (tween) => tween.mesh === mesh && controlsRotation(tween.kind, tween.kind === 'change' && tween.spin),
-    );
   }
 
   private cursorWorld(clientX: number, clientY: number): { x: number; y: number } | null {
@@ -601,18 +791,24 @@ export class DiceRenderer {
   };
 
   render(): void {
+    if (this.dirty) {
+      for (const mesh of this.instanced) mesh.instanceMatrix.needsUpdate = true;
+      this.dirty = false;
+    }
     this.renderer.render(this.scene, this.camera);
   }
 
   dieAt(clientX: number, clientY: number): DieHit | null {
-    if (!this.hasDice) return null;
+    if (!this.hasDice || this.instanced.length === 0) return null;
+    for (const mesh of this.instanced) mesh.boundingSphere = null;
     this.raycaster.setFromCamera(this.ndc(clientX, clientY), this.camera);
-    const hits = this.raycaster.intersectObjects([...this.meshes.values()], true);
+    const hits = this.raycaster.intersectObjects(this.instanced, false);
     if (hits.length === 0) return null;
-    let obj: THREE.Object3D | null = hits[0].object;
-    while (obj && !obj.userData.dieId) obj = obj.parent;
-    if (!obj) return null;
-    return { id: obj.userData.dieId as string, value: obj.userData.value as number };
+    const instanceId = hits[0].instanceId;
+    if (instanceId == null) return null;
+    const die = this.slots[instanceId];
+    if (!die || die.dying) return null;
+    return { id: die.id, value: die.value };
   }
 
   groupAt(clientX: number, clientY: number): number | undefined {
@@ -643,6 +839,7 @@ export class DiceRenderer {
     if (this.rafId !== null) cancelAnimationFrame(this.rafId);
     this.finalizeAnimation();
     this.resizeObserver.disconnect();
+    for (const mesh of this.instanced) mesh.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

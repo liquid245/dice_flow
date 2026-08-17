@@ -22,7 +22,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/icon.svg', 'models/*.glb', 'sounds/*.wav'],
+      includeAssets: ['icons/icon.svg', 'models/lod/*.glb', 'models/lod/manifest.json', 'sounds/*.wav'],
       manifest: {
         name: 'DiceFlow',
         short_name: 'DiceFlow',

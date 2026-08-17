@@ -24,10 +24,6 @@ export type Transition =
     }
   | { kind: 'slide'; id: string; fromX: number; fromY: number; toX: number; toY: number };
 
-export function controlsRotation(kind: Transition['kind'], spin: boolean): boolean {
-  return kind === 'appear' || (kind === 'change' && spin);
-}
-
 export function computeTransitions(prev: DieSnapshot[], next: DieSnapshot[]): Transition[] {
   const prevById = new Map(prev.map((p) => [p.id, p]));
   const nextById = new Map(next.map((n) => [n.id, n]));

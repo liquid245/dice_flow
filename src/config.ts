@@ -61,6 +61,11 @@ export const config = {
       xAmplitude: 0.05,
       xPhaseShift: 1.7,
     },
+    quality: [
+      { maxDice: 30, lod: 0, pixelRatio: 2 },
+      { maxDice: 100, lod: 1, pixelRatio: 1 },
+      { maxDice: Infinity, lod: 2, pixelRatio: 1 },
+    ],
   },
   layout: {
     dieSize: 1,
@@ -81,7 +86,7 @@ export const config = {
       roll: `${base}sounds/629982__flem0527__dice-rolling-on-table.wav`,
       disappear: `${base}sounds/poof.wav`,
     },
-    diceModel: `${base}models/dice.glb`,
+    modelManifest: `${base}models/lod/manifest.json`,
     diceFaces,
   },
   buttons,

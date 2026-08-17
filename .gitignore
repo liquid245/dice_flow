@@ -5,3 +5,4 @@ certs/
 .codegraph/
 .DS_Store
 *.local
+public/models/lod/

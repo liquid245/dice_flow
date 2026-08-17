@@ -238,6 +238,11 @@ For every task:
 8. Report what changed and what was verified.
 9. Bump the `version` in `package.json` (patch/minor) and commit + push.
 
+Every final report must end with the version/build number and what was
+pushed. Format:
+
+    Версия: <semver>. Запушено: <commit subject>.
+
 Do not rewrite large parts of the project when a smaller change is sufficient.
 
 At the current stage every change is for testing: after implementing and
