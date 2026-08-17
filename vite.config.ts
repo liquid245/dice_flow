@@ -1,9 +1,19 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const pkg = JSON.parse(
+  readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf-8'),
+) as { version: string };
+const buildStamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
 export default defineConfig({
   base: '/dice_flow/',
+  define: {
+    __APP_VERSION__: JSON.stringify(`${pkg.version} · ${buildStamp}`),
+  },
   plugins: [
     react(),
     VitePWA({
@@ -16,6 +26,7 @@ export default defineConfig({
         theme_color: '#1a1a1a',
         background_color: '#1a1a1a',
         display: 'standalone',
+        orientation: 'portrait',
         start_url: '/dice_flow/',
         scope: '/dice_flow/',
         icons: [
