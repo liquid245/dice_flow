@@ -42,7 +42,7 @@ export const config = {
     dragLift: 0,
     dragSpacing: 0.55,
     minPerRow: 0,
-    maxPerRow: 10,
+    maxPerRow: 20,
     plate: {
       verticalPadding: 0.15,
       horizontalPadding: 7.6,

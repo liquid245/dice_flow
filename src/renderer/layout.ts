@@ -4,6 +4,7 @@ import { config } from '../config';
 const DIE_SIZE = config.layout.dieSize;
 const DIE_SPACING = config.layout.dieSpacing;
 const GROUP_GAP = config.layout.groupGap;
+const CAMERA_PADDING = config.renderer.cameraPadding;
 
 export interface DiePosition {
   x: number;
@@ -30,11 +31,85 @@ export interface Layout {
   bounds: Bounds;
 }
 
-export function layout(dice: Die[], maxPerRow: number, aspect: number): Layout {
-  const positions = new Map<DiceId, DiePosition>();
-  const bands: GroupBand[] = [];
-  let cursor = 0;
+const VALUES = [6, 5, 4, 3, 2, 1];
 
+interface ColumnOption {
+  cols: number;
+  width: number;
+  height: number;
+}
+
+function widthFor(count: number, rows: number): number {
+  const widest = Math.ceil(count / rows);
+  return (widest - 1) * DIE_SPACING + DIE_SIZE;
+}
+
+function heightFor(rows: number): number {
+  return (rows - 1) * DIE_SPACING + DIE_SIZE;
+}
+
+function columnOptions(count: number, maxPerRow: number): ColumnOption[] {
+  const options: ColumnOption[] = [];
+  const maxCols = Math.min(count, maxPerRow);
+  for (let cols = 1; cols <= maxCols; cols++) {
+    const rows = Math.ceil(count / cols);
+    options.push({ cols, width: widthFor(count, rows), height: heightFor(rows) });
+  }
+  return options;
+}
+
+function chooseColumns(counts: number[], options: (ColumnOption[] | null)[], aspect: number): number[] {
+  const groups: { index: number; options: ColumnOption[] }[] = [];
+  for (let i = 0; i < counts.length; i++) {
+    if (options[i] != null) groups.push({ index: i, options: options[i]! });
+  }
+
+  const result = counts.map(() => 1);
+  if (groups.length === 0) return result;
+
+  let best: { cols: number[]; objective: number } | null = null;
+
+  // For each candidate table width (every column variant of every group),
+  // shrink the other groups to fit that width and measure the free space.
+  for (const widest of groups) {
+    for (const candidate of widest.options) {
+      const width = candidate.width;
+      const cols = new Array<number>(groups.length).fill(0);
+      let height = 0;
+      let feasible = true;
+
+      for (let gi = 0; gi < groups.length; gi++) {
+        let pick: ColumnOption | null = null;
+        for (const option of groups[gi].options) {
+          if (option.width <= width) pick = option;
+        }
+        if (!pick) {
+          feasible = false;
+          break;
+        }
+        cols[gi] = pick.cols;
+        height += pick.height;
+      }
+      if (!feasible) continue;
+
+      height += (groups.length - 1) * GROUP_GAP;
+      const objective = Math.max(
+        width + CAMERA_PADDING * 2,
+        (height + CAMERA_PADDING * 2) * aspect,
+      );
+      if (!best || objective < best.objective) {
+        best = { cols, objective };
+      }
+    }
+  }
+
+  for (let gi = 0; gi < groups.length; gi++) {
+    result[groups[gi].index] = best!.cols[gi];
+  }
+  return result;
+}
+
+export function layout(dice: Die[], maxPerRow: number, aspect: number): Layout {
   const grouped = new Map<number, Die[]>();
   for (const die of dice) {
     const list = grouped.get(die.value);
@@ -42,17 +117,18 @@ export function layout(dice: Die[], maxPerRow: number, aspect: number): Layout {
     else grouped.set(die.value, [die]);
   }
 
-  const counts: number[] = [];
-  for (let value = 6; value >= 1; value--) {
-    const n = grouped.get(value)?.length ?? 0;
-    if (n > 0) counts.push(n);
-  }
+  const counts = VALUES.map((value) => grouped.get(value)?.length ?? 0);
+  const options = counts.map((count) => (count > 0 ? columnOptions(count, maxPerRow) : null));
+  const colsPerGroup = chooseColumns(counts, options, aspect);
 
-  const cols = columnsFor(counts, aspect, maxPerRow);
+  const positions = new Map<DiceId, DiePosition>();
+  const bands: GroupBand[] = [];
+  let cursor = 0;
 
-  for (let value = 6; value >= 1; value--) {
-    const groupDice = grouped.get(value) ?? [];
-    const count = groupDice.length;
+  for (let gi = 0; gi < VALUES.length; gi++) {
+    const value = VALUES[gi];
+    const count = counts[gi];
+    const cols = count > 0 ? colsPerGroup[gi] : 1;
     const rows = count === 0 ? 1 : Math.max(1, Math.ceil(count / cols));
 
     const rowCounts = new Array<number>(rows).fill(0);
@@ -63,6 +139,7 @@ export function layout(dice: Die[], maxPerRow: number, aspect: number): Layout {
     const height = (rows - 1) * DIE_SPACING + DIE_SIZE;
     bands.push({ value, top: cursor, bottom: cursor - height });
 
+    const groupDice = grouped.get(value) ?? [];
     const rowIndex = new Array<number>(rows).fill(0);
     groupDice.forEach((die, i) => {
       const row = Math.floor((i * rows) / count);
@@ -76,26 +153,6 @@ export function layout(dice: Die[], maxPerRow: number, aspect: number): Layout {
   }
 
   return { positions, bands, bounds: computeBounds(positions, bands) };
-}
-
-export function columnsFor(counts: number[], aspect: number, maxPerRow: number): number {
-  const total = counts.reduce((a, b) => a + b, 0);
-  if (total <= 1) return 1;
-
-  let best = 1;
-  let bestError = Infinity;
-  for (let cols = 1; cols <= maxPerRow; cols++) {
-    let rows = 0;
-    for (const n of counts) rows += Math.max(1, Math.ceil(n / cols));
-    const height = rows * DIE_SPACING + (counts.length - 1) * GROUP_GAP;
-    const width = cols * DIE_SPACING;
-    const error = Math.abs(width / height - aspect);
-    if (error < bestError) {
-      bestError = error;
-      best = cols;
-    }
-  }
-  return best;
 }
 
 function computeBounds(positions: Map<DiceId, DiePosition>, bands: GroupBand[]): Bounds {
