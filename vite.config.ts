@@ -14,6 +14,10 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(`${pkg.version} · ${buildStamp}`),
   },
+  build: {
+    target: 'safari15',
+    cssTarget: 'safari15',
+  },
   plugins: [
     react(),
     VitePWA({
