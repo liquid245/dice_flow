@@ -236,6 +236,12 @@ describe('selectGroups', () => {
     expect(next.selectedGroups).toEqual({ min: 3, max: 3 });
   });
 
+  it('returns the same state when the selection is unchanged', () => {
+    const selected = reduce(state, { type: 'selectGroups', min: 2, max: 4 }, makeDeps([]));
+    const again = reduce(selected, { type: 'selectGroups', min: 2, max: 4 }, makeDeps([]));
+    expect(again).toBe(selected);
+  });
+
   it('is cleared by a non-selection action', () => {
     const selected = reduce(state, { type: 'selectGroups', min: 2, max: 4 }, makeDeps([]));
     const moved = reduce(selected, { type: 'move', targetValue: 5 }, makeDeps([]));

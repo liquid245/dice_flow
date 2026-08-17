@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { selectRangeGroups } from './groupSwipe';
+import { selectRangeGroups, sameGroupRange } from './groupSwipe';
 
 describe('selectRangeGroups', () => {
   it('emits a group-range select action', () => {
@@ -12,5 +12,19 @@ describe('selectRangeGroups', () => {
 
   it('returns a single group for equal endpoints', () => {
     expect(selectRangeGroups(2, 2)).toEqual({ type: 'selectGroups', min: 2, max: 2 });
+  });
+});
+
+describe('sameGroupRange', () => {
+  it('is false without a previous range', () => {
+    expect(sameGroupRange(null, 1, 3)).toBe(false);
+  });
+
+  it('is direction-agnostic', () => {
+    expect(sameGroupRange({ min: 2, max: 4 }, 4, 2)).toBe(true);
+  });
+
+  it('detects a changed range', () => {
+    expect(sameGroupRange({ min: 2, max: 4 }, 2, 5)).toBe(false);
   });
 });

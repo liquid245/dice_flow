@@ -134,11 +134,14 @@ function select(state: GameState, ids: string[], mode: SelectMode): GameState {
 function selectGroupRange(state: GameState, min: number, max: number): GameState {
   const lo = Math.min(min, max);
   const hi = Math.max(min, max);
+  const groups = state.selectedGroups;
+  let changed = !(groups && groups.min === lo && groups.max === hi);
   const dice: Die[] = state.dice.map((d) => {
     const selected = d.value >= lo && d.value <= hi;
+    if (d.selected !== selected) changed = true;
     return d.selected === selected ? d : { ...d, selected };
   });
-  return { ...state, dice, selectedGroups: { min: lo, max: hi } };
+  return changed ? { ...state, dice, selectedGroups: { min: lo, max: hi } } : state;
 }
 
 function clear(state: GameState): GameState {

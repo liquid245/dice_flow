@@ -7,3 +7,11 @@ export function selectRangeGroups(startValue: number, endValue: number): GameAct
     max: Math.max(startValue, endValue),
   };
 }
+
+export function sameGroupRange(
+  last: { min: number; max: number } | null,
+  startValue: number,
+  endValue: number,
+): boolean {
+  return !!last && last.min === Math.min(startValue, endValue) && last.max === Math.max(startValue, endValue);
+}
