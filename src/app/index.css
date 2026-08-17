@@ -57,21 +57,25 @@ body {
 }
 
 .action-row {
-  display: flex;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(4px, 1.5vw, 8px);
   width: 100%;
 }
 
 .action-bar button {
-  flex: 1 1 auto;
-  min-width: 64px;
-  padding: 10px 8px;
+  width: 100%;
+  min-width: 0;
+  padding: clamp(6px, 1.5vw, 10px) clamp(4px, 1vw, 8px);
   border-radius: 8px;
   border: 1px solid #3a3a3a;
   background: #2a2a2a;
   color: #eee;
-  font-size: 14px;
+  font-size: clamp(12px, 3vw, 16px);
   cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .action-bar button:disabled {

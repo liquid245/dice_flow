@@ -63,7 +63,7 @@ export const config = {
     },
     pixelate: {
       enabled: false,
-      pixelSize: 6,
+      pixelSize: 3,
       normalEdgeStrength: 0,
       depthEdgeStrength: 0,
     },
