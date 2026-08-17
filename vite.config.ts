@@ -7,12 +7,11 @@ import { fileURLToPath } from 'node:url';
 const pkg = JSON.parse(
   readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf-8'),
 ) as { version: string };
-const buildStamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
 export default defineConfig({
   base: '/dice_flow/',
   define: {
-    __APP_VERSION__: JSON.stringify(`${pkg.version} · ${buildStamp}`),
+    __APP_VERSION__: JSON.stringify(pkg.version),
   },
   build: {
     target: 'safari15',

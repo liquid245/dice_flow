@@ -81,8 +81,6 @@ export function RendererCanvas() {
   };
 
   return (
-    <div ref={containerRef} className="table" {...pointerHandlers}>
-      <span className="version-label">{__APP_VERSION__}</span>
-    </div>
+    <div ref={containerRef} className="table" {...pointerHandlers} />
   );
 }
