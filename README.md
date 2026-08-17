@@ -284,9 +284,11 @@ app shell (JS, CSS, модель, звуки), после чего прилож�
 
 ### Хостинг в интернете
 
-1. Залить репозиторий на GitHub.
-2. Подключить Netlify / Vercel / GitHub Pages (HTTPS из коробки).
-3. Команда сборки — `npm run build`, каталог — `dist`.
+Деплой настроен через GitHub Actions на GitHub Pages:
+
+1. Включить Pages: Settings → Pages → Source = «GitHub Actions».
+2. Push в `main` → workflow соберёт и выложит `dist`.
+3. Готовый URL: https://liquid245.github.io/dice_flow/
 4. Установить PWA на устройство → оффлайн работает.
 
 Обновление версии происходит автоматически (`registerType: autoUpdate`):
