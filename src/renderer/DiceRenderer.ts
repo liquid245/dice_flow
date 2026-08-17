@@ -564,6 +564,7 @@ export class DiceRenderer {
   private writeStaticMatrices(now: number): void {
     for (let i = 0; i < this.slots.length; i++) {
       const die = this.slots[i];
+      if (this.idSlot.get(die.id) !== i) continue;
       if (die.selected || this.tweenIds.has(die.id)) continue;
       this.writeMatrix(i, now);
     }
@@ -719,6 +720,7 @@ export class DiceRenderer {
     const now = performance.now();
     for (let i = 0; i < this.slots.length; i++) {
       const die = this.slots[i];
+      if (this.idSlot.get(die.id) !== i) continue;
       if (this.tweenIds.has(die.id)) continue;
       const scale = this.dragOffsets.has(die.id) ? config.renderer.grabScale : 1;
       if (die.scale !== scale) {
