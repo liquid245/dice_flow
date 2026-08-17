@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPixelatedPass } from 'three/examples/jsm/postprocessing/RenderPixelatedPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { GameState } from '../core/game/state';
 import type { DiceId, Die } from '../core/dice/types';
 import { loadDiceModel, type LodGroup } from './dice';
@@ -43,6 +46,8 @@ export class DiceRenderer {
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
   private camera: THREE.OrthographicCamera;
+  private composer: EffectComposer | null = null;
+  private pixelPass: RenderPixelatedPass | null = null;
   private raycaster = new THREE.Raycaster();
   private resizeObserver: ResizeObserver;
   private materialGroups: LodGroup[] = [];
@@ -114,6 +119,17 @@ export class DiceRenderer {
     }
 
     this.createPlates();
+
+    if (config.renderer.pixelate.enabled) {
+      const pixelate = config.renderer.pixelate;
+      this.pixelPass = new RenderPixelatedPass(pixelate.pixelSize, this.scene, this.camera, {
+        normalEdgeStrength: pixelate.normalEdgeStrength,
+        depthEdgeStrength: pixelate.depthEdgeStrength,
+      });
+      this.composer = new EffectComposer(this.renderer);
+      this.composer.addPass(this.pixelPass);
+      this.composer.addPass(new OutputPass());
+    }
 
     loadDiceModel()
       .then((groups) => {
@@ -231,6 +247,7 @@ export class DiceRenderer {
     const width = this.container.clientWidth || 1;
     const height = this.container.clientHeight || 1;
     this.renderer.setSize(width, height, false);
+    this.composer?.setSize(width, height);
     this.maxPerRow = config.renderer.maxPerRow;
     this.relayout();
     this.render();
@@ -757,7 +774,8 @@ export class DiceRenderer {
       for (const mesh of this.instanced) mesh.instanceMatrix.needsUpdate = true;
       this.dirty = false;
     }
-    this.renderer.render(this.scene, this.camera);
+    if (this.composer) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
   }
 
   dieAt(clientX: number, clientY: number): DieHit | null {
@@ -802,6 +820,8 @@ export class DiceRenderer {
     this.finalizeAnimation();
     this.resizeObserver.disconnect();
     for (const mesh of this.instanced) mesh.dispose();
+    this.pixelPass?.dispose();
+    this.composer?.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

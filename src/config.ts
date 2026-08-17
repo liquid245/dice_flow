@@ -61,6 +61,12 @@ export const config = {
       xAmplitude: 0.05,
       xPhaseShift: 1.7,
     },
+    pixelate: {
+      enabled: false,
+      pixelSize: 6,
+      normalEdgeStrength: 0,
+      depthEdgeStrength: 0,
+    },
   },
   layout: {
     dieSize: 1,
