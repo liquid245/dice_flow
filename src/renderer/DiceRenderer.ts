@@ -263,13 +263,21 @@ export class DiceRenderer {
       this.prev = next;
       this.updatePlateGeometry();
       this.fitCamera();
-      if (transitions.length > 0) this.animate(transitions, !isInitial);
+      if (!isInitial && transitions.length > 0) this.animate(transitions, true);
     }
 
     this.selected.clear();
     for (const die of state.dice) {
       const mesh = this.ensureMesh(die.id, die.value);
       if (die.selected) this.selected.add(mesh);
+    }
+
+    if (isInitial) {
+      for (const mesh of this.meshes.values()) {
+        const position = this.layout.positions.get(mesh.userData.dieId as string);
+        if (position) mesh.position.set(position.x, position.y, 0);
+        mesh.scale.setScalar(1);
+      }
     }
 
     for (const mesh of this.meshes.values()) {
