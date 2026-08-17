@@ -92,4 +92,24 @@ export const config = {
   },
   buttons,
   buttonVisibility,
+  ui: {
+    fontScale: 1,
+    infoPanel: {
+      centered: true,
+      swipeHint: 'Swipe Finger to Add or Reduce Dices',
+    },
+    history: {
+      kindLabels: {
+        roll: 'Roll',
+        reroll: 'ReRoll',
+        add: 'Add',
+        delete: 'Delete',
+        move: 'Move',
+        clear: 'Clear',
+      } as Record<string, string>,
+      format: '{kind}{count}{value}',
+      countPrefix: ' ',
+      valuePrefix: ':',
+    },
+  },
 };
