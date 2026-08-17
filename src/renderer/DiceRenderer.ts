@@ -1,14 +1,13 @@
 import * as THREE from 'three';
 import type { GameState } from '../core/game/state';
 import type { DiceId, Die } from '../core/dice/types';
-import { loadDiceModel, type DiceModel, type LodGroup } from './dice';
+import { loadDiceModel, type LodGroup } from './dice';
 import { layout, type Layout } from './layout';
 import { computeTransitions, type DieSnapshot, type Transition } from './animator';
 import type { DieHit } from '../input/hitTest';
 import { config } from '../config';
 import { playSound, type SoundName } from '../services/audio';
 import { plateOpacity } from './plateOpacity';
-import { qualityTier, lodLevelFor, adaptivePixelRatio } from './quality';
 
 type Tween =
   | { kind: 'appear'; id: DiceId }
@@ -46,12 +45,9 @@ export class DiceRenderer {
   private camera: THREE.OrthographicCamera;
   private raycaster = new THREE.Raycaster();
   private resizeObserver: ResizeObserver;
-  private model: DiceModel | null = null;
   private materialGroups: LodGroup[] = [];
   private instanced: THREE.InstancedMesh[] = [];
   private capacity = DEFAULT_CAPACITY;
-  private currentLod = 0;
-  private lodPending = false;
   private ready = false;
 
   private slots: DieInstance[] = [];
@@ -120,13 +116,10 @@ export class DiceRenderer {
     this.createPlates();
 
     loadDiceModel()
-      .then((model) => {
-        this.model = model;
-        return model.loadLod(0);
-      })
-      .then((lod) => {
-        this.materialGroups = lod.groups;
-        this.applyLod();
+      .then((groups) => {
+        this.materialGroups = groups;
+        this.rebuildInstanced();
+        this.writeAllMatrices(performance.now());
         this.ready = true;
         if (this.lastState) this.sync(this.lastState);
       })
@@ -334,7 +327,6 @@ export class DiceRenderer {
     this.writeStaticMatrices(now);
     this.applyShake(now);
 
-    this.applyQuality(state.dice.length);
     this.applyGrabbedScale();
     this.updatePlateHighlights();
     this.resetPendingDrag();
@@ -423,38 +415,6 @@ export class DiceRenderer {
       this.scene.add(mesh);
     }
     this.dirty = true;
-  }
-
-  private applyLod(): void {
-    this.rebuildInstanced();
-    this.writeAllMatrices(performance.now());
-  }
-
-  private applyQuality(diceCount: number): void {
-    if (!this.model) return;
-    const tier = qualityTier(diceCount, config.renderer.quality);
-    const lod = lodLevelFor(tier, this.model.lodCount);
-    if (lod !== this.currentLod && !this.lodPending) {
-      this.currentLod = lod;
-      this.lodPending = true;
-      this.model
-        .loadLod(lod)
-        .then((level) => {
-          this.lodPending = false;
-          if (lod !== this.currentLod) return;
-          this.materialGroups = level.groups;
-          this.applyLod();
-          this.render();
-        })
-        .catch(() => {
-          this.lodPending = false;
-        });
-    }
-    const ratio = adaptivePixelRatio(tier, window.devicePixelRatio || 1);
-    if (Math.abs(ratio - this.renderer.getPixelRatio()) > 0.001) {
-      this.renderer.setPixelRatio(ratio);
-      this.renderer.setSize(this.container.clientWidth || 1, this.container.clientHeight || 1, false);
-    }
   }
 
   private animate(transitions: Transition[], playAudio: boolean): void {

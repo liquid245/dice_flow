@@ -1,16 +1,14 @@
 {
   "name": "dice-flow",
   "private": true,
-  "version": "0.1.7",
+  "version": "0.1.8",
   "type": "module",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "dev": "vite",
-    "predev": "node scripts/generate-lods.mjs",
     "build": "tsc --noEmit && vite build",
-    "prebuild": "node scripts/generate-lods.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

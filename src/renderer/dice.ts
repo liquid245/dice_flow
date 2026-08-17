@@ -8,39 +8,9 @@ export interface LodGroup {
   material: THREE.Material;
 }
 
-export interface DiceLod {
-  groups: LodGroup[];
-  vertices: number;
-}
+let groupsPromise: Promise<LodGroup[]> | null = null;
 
-interface LodEntry {
-  file: string;
-  vertices: number;
-}
-
-interface ModelEntry {
-  name: string;
-  lods: LodEntry[];
-}
-
-interface Manifest {
-  models: ModelEntry[];
-}
-
-let manifestPromise: Promise<Manifest> | null = null;
-const lodPromises = new Map<string, Promise<DiceLod>>();
-
-function loadManifest(): Promise<Manifest> {
-  if (!manifestPromise) {
-    manifestPromise = fetch(config.assets.modelManifest).then((response) => {
-      if (!response.ok) throw new Error(`Failed to load model manifest: ${response.status}`);
-      return response.json() as Promise<Manifest>;
-    });
-  }
-  return manifestPromise;
-}
-
-function mergeByMaterial(scene: THREE.Object3D): DiceLod {
+function mergeByMaterial(scene: THREE.Object3D): LodGroup[] {
   scene.updateMatrixWorld(true);
   const byMaterial = new Map<THREE.Material, THREE.BufferGeometry[]>();
   scene.traverse((object) => {
@@ -75,30 +45,12 @@ function mergeByMaterial(scene: THREE.Object3D): DiceLod {
     group.geometry.computeBoundingSphere();
   }
 
-  return { groups, vertices: 0 };
+  return groups;
 }
 
-export interface DiceModel {
-  lodCount: number;
-  loadLod(level: number): Promise<DiceLod>;
-}
-
-export async function loadDiceModel(): Promise<DiceModel> {
-  const manifest = await loadManifest();
-  const model = manifest.models[0];
-  if (!model) throw new Error('No models in the manifest');
-  const base = config.assets.modelManifest.replace(/manifest\.json$/, '');
-  return {
-    lodCount: model.lods.length,
-    loadLod(level: number): Promise<DiceLod> {
-      const entry = model.lods[Math.min(Math.max(level, 0), model.lods.length - 1)];
-      const url = base + entry.file;
-      let promise = lodPromises.get(url);
-      if (!promise) {
-        promise = new GLTFLoader().loadAsync(url).then((gltf) => mergeByMaterial(gltf.scene));
-        lodPromises.set(url, promise);
-      }
-      return promise;
-    },
-  };
+export function loadDiceModel(): Promise<LodGroup[]> {
+  if (!groupsPromise) {
+    groupsPromise = new GLTFLoader().loadAsync(config.assets.diceModel).then((gltf) => mergeByMaterial(gltf.scene));
+  }
+  return groupsPromise;
 }
