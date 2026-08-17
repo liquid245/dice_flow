@@ -84,6 +84,9 @@ export class DiceRenderer {
   private plateTargets = new Map<number, number>();
   private plateFades = new Map<number, { from: number; start: number }>();
 
+  private scaleTargets = new Map<DiceId, number>();
+  private scaleFades = new Map<DiceId, { from: number; start: number }>();
+
   private faceQuats: THREE.Quaternion[] = [];
   private qIdentity = new THREE.Quaternion();
   private qA = new THREE.Quaternion();
@@ -226,6 +229,32 @@ export class DiceRenderer {
       } else {
         const e = 1 - Math.pow(1 - t, 3);
         material.opacity = fade.from + (target - fade.from) * e;
+        active = true;
+      }
+    }
+    return active;
+  }
+
+  private stepScaleFade(now: number): boolean {
+    const duration = config.renderer.grabAnimMs;
+    let active = false;
+    for (const [id, fade] of this.scaleFades) {
+      const slot = this.idSlot.get(id);
+      const target = this.scaleTargets.get(id);
+      if (slot == null || target === undefined) {
+        this.scaleFades.delete(id);
+        continue;
+      }
+      const die = this.slots[slot];
+      const t = duration <= 0 ? 1 : (now - fade.start) / duration;
+      if (t >= 1) {
+        die.scale = target;
+        this.writeMatrix(slot, now);
+        this.scaleFades.delete(id);
+      } else {
+        const e = 1 - Math.pow(1 - t, 3);
+        die.scale = fade.from + (target - fade.from) * e;
+        this.writeMatrix(slot, now);
         active = true;
       }
     }
@@ -757,12 +786,24 @@ export class DiceRenderer {
       const die = this.slots[i];
       if (this.idSlot.get(die.id) !== i) continue;
       if (this.tweenIds.has(die.id)) continue;
-      const scale = this.dragOffsets.has(die.id) ? config.renderer.grabScale : 1;
-      if (die.scale !== scale) {
-        die.scale = scale;
-        this.writeMatrix(i, now);
-      }
+      const target = this.dragOffsets.has(die.id) ? config.renderer.grabScale : 1;
+      this.setDieScale(die.id, target, now);
     }
+  }
+
+  private setDieScale(id: DiceId, target: number, now: number): void {
+    const slot = this.idSlot.get(id);
+    if (slot == null) return;
+    const die = this.slots[slot];
+    if (die.scale === target) {
+      this.scaleFades.delete(id);
+      this.scaleTargets.set(id, target);
+      return;
+    }
+    if (this.scaleTargets.get(id) === target) return;
+    this.scaleTargets.set(id, target);
+    this.scaleFades.set(id, { from: die.scale, start: now });
+    this.ensureLoop();
   }
 
   private cursorWorld(clientX: number, clientY: number): { x: number; y: number } | null {
@@ -781,9 +822,10 @@ export class DiceRenderer {
     this.stepTweens(now);
     this.applyShake(now);
     const fading = this.stepPlateFade(now);
+    const scaling = this.stepScaleFade(now);
     this.render();
 
-    const active = this.tweens.length > 0 || this.selected.size > 0 || fading;
+    const active = this.tweens.length > 0 || this.selected.size > 0 || fading || scaling;
     this.rafId = active ? requestAnimationFrame(this.tick) : null;
   };
 

@@ -39,6 +39,7 @@ export const config = {
     animationDurationMs: 400,
     cameraPadding: 0.80,
     grabScale: 1.25,
+    grabAnimMs: 120,
     dragLift: 0,
     dragSpacing: 0.55,
     minPerRow: 0,
