@@ -93,6 +93,11 @@ export class DiceRenderer {
   private scaleTargets = new Map<DiceId, number>();
   private scaleFades = new Map<DiceId, { from: number; start: number }>();
 
+  private cameraAnimating = false;
+  private cameraStart = 0;
+  private cameraFrom = { halfWidth: 1, halfHeight: 1, centerX: 0, centerY: 0 };
+  private cameraTo = { halfWidth: 1, halfHeight: 1, centerX: 0, centerY: 0 };
+
   private faceQuats: THREE.Quaternion[] = [];
   private qIdentity = new THREE.Quaternion();
   private qA = new THREE.Quaternion();
@@ -322,11 +327,11 @@ export class DiceRenderer {
     this.prev = this.synced && this.lastState ? this.snapshots(this.lastState) : [];
     this.updatePlateGeometry();
     this.updatePlateHighlights();
-    this.fitCamera();
+    this.fitCamera(false);
     this.writeStaticMatrices(now);
   }
 
-  private fitCamera(): void {
+  private fitCamera(animated: boolean): void {
     const bounds = this.layout.bounds;
     const contentWidth = Math.max(bounds.maxX - bounds.minX, 1) + config.renderer.cameraPadding * 2;
     const contentHeight = Math.max(bounds.maxY - bounds.minY, 1) + config.renderer.cameraPadding * 2;
@@ -347,13 +352,52 @@ export class DiceRenderer {
       halfWidth = halfHeight * aspect;
     }
 
-    this.camera.left = -halfWidth;
-    this.camera.right = halfWidth;
-    this.camera.top = halfHeight;
-    this.camera.bottom = -halfHeight;
-    this.camera.position.set(centerX, centerY, 10);
-    this.camera.lookAt(centerX, centerY, 0);
+    const target = { halfWidth, halfHeight, centerX, centerY };
+    const near =
+      Math.abs(target.halfWidth - this.cameraTo.halfWidth) < 0.0001 &&
+      Math.abs(target.halfHeight - this.cameraTo.halfHeight) < 0.0001 &&
+      Math.abs(target.centerX - this.cameraTo.centerX) < 0.0001 &&
+      Math.abs(target.centerY - this.cameraTo.centerY) < 0.0001;
+    if (!animated || near) {
+      this.cameraTo = target;
+      this.applyCamera(target);
+      this.cameraAnimating = false;
+      return;
+    }
+    this.cameraFrom = { ...this.cameraTo };
+    this.cameraTo = target;
+    this.cameraStart = performance.now();
+    this.cameraAnimating = true;
+    this.ensureLoop();
+  }
+
+  private applyCamera(c: { halfWidth: number; halfHeight: number; centerX: number; centerY: number }): void {
+    this.camera.left = -c.halfWidth;
+    this.camera.right = c.halfWidth;
+    this.camera.top = c.halfHeight;
+    this.camera.bottom = -c.halfHeight;
+    this.camera.position.set(c.centerX, c.centerY, 10);
+    this.camera.lookAt(c.centerX, c.centerY, 0);
     this.camera.updateProjectionMatrix();
+  }
+
+  private stepCamera(now: number): boolean {
+    if (!this.cameraAnimating) return false;
+    const t = Math.min(1, (now - this.cameraStart) / config.renderer.animationDurationMs);
+    const e = 1 - Math.pow(1 - t, 3);
+    const c = {
+      halfWidth: this.cameraFrom.halfWidth + (this.cameraTo.halfWidth - this.cameraFrom.halfWidth) * e,
+      halfHeight: this.cameraFrom.halfHeight + (this.cameraTo.halfHeight - this.cameraFrom.halfHeight) * e,
+      centerX: this.cameraFrom.centerX + (this.cameraTo.centerX - this.cameraFrom.centerX) * e,
+      centerY: this.cameraFrom.centerY + (this.cameraTo.centerY - this.cameraFrom.centerY) * e,
+    };
+    this.applyCamera(c);
+    if (t >= 1) {
+      this.applyCamera(this.cameraTo);
+      this.cameraAnimating = false;
+      return false;
+    }
+    return true;
   }
 
   sync(state: GameState): void {
@@ -380,7 +424,7 @@ export class DiceRenderer {
       const transitions = computeTransitions(this.prev, next);
       this.prev = next;
       this.updatePlateGeometry();
-      this.fitCamera();
+      this.fitCamera(!isInitial);
       if (isInitial) {
         this.populateInitial(state);
       } else if (transitions.length > 0) {
@@ -537,13 +581,11 @@ export class DiceRenderer {
         if (slot == null) slot = this.allocateSlot(transition.id, transition.fromValue, transition.fromX, transition.fromY);
         const die = this.slots[slot];
         die.value = transition.fromValue;
-        die.x = transition.fromX;
-        die.y = transition.fromY;
         tweens.push({
           kind: 'change',
           id: transition.id,
-          fromX: transition.fromX,
-          fromY: transition.fromY,
+          fromX: die.x,
+          fromY: die.y,
           toX: transition.toX,
           toY: transition.toY,
           fromValue: transition.fromValue,
@@ -801,16 +843,7 @@ export class DiceRenderer {
   }
 
   private endDrag(): void {
-    const now = performance.now();
-    for (const id of this.dragOffsets.keys()) {
-      const slot = this.idSlot.get(id);
-      const position = this.layout.positions.get(id);
-      if (slot != null && position) {
-        this.slots[slot].x = position.x;
-        this.slots[slot].y = position.y;
-        this.writeMatrix(slot, now);
-      }
-    }
+    this.slideToLayout(this.dragOffsets.keys());
     this.dragId = null;
     this.dragOffsets.clear();
     this.dragStartTime = null;
@@ -835,18 +868,25 @@ export class DiceRenderer {
   }
 
   private resetPendingDrag(): void {
-    const now = performance.now();
-    for (const id of this.pendingDragReset) {
-      const slot = this.idSlot.get(id);
-      if (slot == null || this.tweenIds.has(id)) continue;
-      const position = this.layout.positions.get(id);
-      if (position) {
-        this.slots[slot].x = position.x;
-        this.slots[slot].y = position.y;
-        this.writeMatrix(slot, now);
-      }
-    }
+    this.slideToLayout(this.pendingDragReset);
     this.pendingDragReset.clear();
+  }
+
+  private slideToLayout(ids: Iterable<DiceId>): void {
+    const wasEmpty = this.tweens.length === 0;
+    for (const id of ids) {
+      if (this.tweenIds.has(id)) continue;
+      const slot = this.idSlot.get(id);
+      if (slot == null) continue;
+      const position = this.layout.positions.get(id);
+      if (!position) continue;
+      const die = this.slots[slot];
+      if (die.x === position.x && die.y === position.y) continue;
+      this.tweens.push({ kind: 'slide', id, fromX: die.x, fromY: die.y, toX: position.x, toY: position.y });
+      this.tweenIds.add(id);
+    }
+    if (wasEmpty && this.tweens.length > 0) this.tweenStart = performance.now();
+    if (this.tweens.length > 0) this.ensureLoop();
   }
 
   private applyGrabbedScale(): void {
@@ -888,11 +928,12 @@ export class DiceRenderer {
   private tick = (now: number) => {
     this.stepTweens(now);
     this.applyShake(now);
+    const camera = this.stepCamera(now);
     const fading = this.stepPlateFade(now);
     const scaling = this.stepScaleFade(now);
     this.render();
 
-    const active = this.tweens.length > 0 || this.shakeActive || fading || scaling;
+    const active = this.tweens.length > 0 || this.shakeActive || fading || scaling || camera;
     this.rafId = active ? requestAnimationFrame(this.tick) : null;
   };
 
