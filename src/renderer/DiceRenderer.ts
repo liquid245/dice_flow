@@ -478,6 +478,10 @@ export class DiceRenderer {
   }
 
   private allocateSlot(id: DiceId, value: number, x: number, y: number): number {
+    const existingSlot = this.idSlot.get(id);
+    if (existingSlot != null && this.slots[existingSlot]?.dying) {
+      this.freeSlot(existingSlot, this.slots[existingSlot]);
+    }
     const instance: DieInstance = {
       id,
       value,
@@ -547,6 +551,7 @@ export class DiceRenderer {
     const slot = this.idSlot.get(id);
     if (slot == null) return;
     const die = this.slots[slot];
+    if (die.dying) return;
     const now = performance.now();
     if (patch.x !== undefined && patch.x !== die.tx) {
       die.tx = patch.x;
@@ -733,6 +738,7 @@ export class DiceRenderer {
     const slot = this.idSlot.get(id);
     if (slot == null) return;
     const die = this.slots[slot];
+    if (die.dying) return;
     const now = performance.now();
     die.tx = x;
     die.ty = y;
