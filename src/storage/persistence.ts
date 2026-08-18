@@ -10,6 +10,8 @@ export interface PersistableEngine {
 
 export function initPersistence(engine: PersistableEngine, storage: GameStorage): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let changedBeforeRestore = false;
+  let restoring = false;
 
   const flush = () => {
     if (timer !== undefined) {
@@ -19,13 +21,21 @@ export function initPersistence(engine: PersistableEngine, storage: GameStorage)
     void storage.saveGame(engine.getState());
   };
 
-  void storage.loadGame().then((state) => {
-    if (state) engine.restore(state);
-  });
-
   const unsubscribe = engine.subscribe(() => {
+    if (restoring) return;
+    changedBeforeRestore = true;
     if (timer !== undefined) clearTimeout(timer);
     timer = setTimeout(flush, config.storage.saveDebounceMs);
+  });
+
+  void storage.loadGame().then((state) => {
+    if (!state || changedBeforeRestore) return;
+    restoring = true;
+    try {
+      engine.restore(state);
+    } finally {
+      restoring = false;
+    }
   });
 
   const onVisibilityChange = () => {

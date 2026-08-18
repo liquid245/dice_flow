@@ -8,7 +8,7 @@ function empty(): GameState {
   return { dice: [], history: [], swipeAddAvailable: true, rememberedValues: [], selection: noneSelection };
 }
 
-function fakeEngine(initial: GameState): PersistableEngine & { emit(): void } {
+function fakeEngine(initial: GameState): PersistableEngine & { emit(): void; setState(state: GameState): void } {
   let current = initial;
   const listeners = new Set<() => void>();
   return {
@@ -22,6 +22,9 @@ function fakeEngine(initial: GameState): PersistableEngine & { emit(): void } {
     },
     emit() {
       for (const listener of listeners) listener();
+    },
+    setState(state) {
+      current = state;
     },
   };
 }
@@ -52,6 +55,29 @@ describe('initPersistence', () => {
     await Promise.resolve();
 
     expect(engine.getState().swipeAddAvailable).toBe(false);
+  });
+
+  it('does not overwrite a change made before loading completes', async () => {
+    let resolveLoad: (state: GameState | null) => void;
+    const storage = {
+      loadGame: vi.fn(
+        () =>
+          new Promise<GameState | null>((resolve) => {
+            resolveLoad = resolve;
+          }),
+      ),
+      saveGame: vi.fn(async () => undefined),
+    } satisfies GameStorage;
+    const engine = fakeEngine(empty());
+
+    initPersistence(engine, storage);
+    const changed = { ...empty(), swipeAddAvailable: false };
+    engine.setState(changed);
+    engine.emit();
+    resolveLoad!({ ...empty(), swipeAddAvailable: true });
+    await Promise.resolve();
+
+    expect(engine.getState()).toBe(changed);
   });
 
   it('saves state after a debounce following a change', () => {
