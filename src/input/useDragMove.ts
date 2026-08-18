@@ -111,9 +111,9 @@ export function useDragMove(
       engine.dispatch(action);
     } else {
       engine.dispatch({ type: 'select', ids: [], mode: 'set' });
-      onDrag?.(null);
     }
     engine.endTransaction();
+    onDrag?.(null);
   }
 
   function cancel() {

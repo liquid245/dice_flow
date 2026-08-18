@@ -7,28 +7,12 @@ import { isDieSelected } from '../core/selection/selection';
 import { loadDiceModel, type LodGroup } from './dice';
 import { layout, type Layout } from './layout';
 import { computeTransitions, type DieSnapshot, type Transition } from './animator';
+import { startMotion, motionValue, motionProgress, motionDone, type Motion } from './motion';
 import type { DieHit } from '../input/hitTest';
 import { config } from '../config';
 import { playSound, type SoundName } from '../services/audio';
 import { vibrate, type VibrationName } from '../services/vibration';
 import { plateOpacity } from './plateOpacity';
-
-type Tween =
-  | { kind: 'appear'; id: DiceId }
-  | { kind: 'remove'; id: DiceId }
-  | { kind: 'slide'; id: DiceId; fromX: number; fromY: number; toX: number; toY: number }
-  | {
-      kind: 'change';
-      id: DiceId;
-      fromX: number;
-      fromY: number;
-      toX: number;
-      toY: number;
-      fromValue: number;
-      toValue: number;
-      valueApplied: boolean;
-      spin: boolean;
-    };
 
 interface DieInstance {
   id: DiceId;
@@ -39,6 +23,16 @@ interface DieInstance {
   selected: boolean;
   shakePhase: number;
   dying: boolean;
+  spin: number;
+  tx: number;
+  ty: number;
+  tscale: number;
+  tvalue: number;
+  mx: Motion | null;
+  my: Motion | null;
+  mscale: Motion | null;
+  mspin: Motion | null;
+  mvalue: Motion | null;
 }
 
 const DEFAULT_CAPACITY = 512;
@@ -69,9 +63,6 @@ export class DiceRenderer {
   private lastState: GameState | null = null;
   private maxPerRow = 6;
   private prev: DieSnapshot[] = [];
-  private tweens: Tween[] = [];
-  private tweenIds = new Set<DiceId>();
-  private tweenStart = 0;
   private rafId: number | null = null;
   private hasDice = false;
   private synced = false;
@@ -80,18 +71,10 @@ export class DiceRenderer {
   private dragId: DiceId | null = null;
   private dragSolo = false;
   private dragOffsets = new Map<DiceId, { x: number; y: number }>();
-  private dragCursor: { x: number; y: number } | null = null;
   private dragTarget: number | null = null;
-  private pendingDragReset = new Set<DiceId>();
-  private dragStartTime: number | null = null;
-  private dragStartPositions = new Map<DiceId, { x: number; y: number }>();
-  private readonly CATCH_UP_MS = 150;
 
   private plateTargets = new Map<number, number>();
   private plateFades = new Map<number, { from: number; start: number }>();
-
-  private scaleTargets = new Map<DiceId, number>();
-  private scaleFades = new Map<DiceId, { from: number; start: number }>();
 
   private cameraAnimating = false;
   private cameraStart = 0;
@@ -260,32 +243,6 @@ export class DiceRenderer {
     return active;
   }
 
-  private stepScaleFade(now: number): boolean {
-    const duration = config.renderer.grabAnimMs;
-    let active = false;
-    for (const [id, fade] of this.scaleFades) {
-      const slot = this.idSlot.get(id);
-      const target = this.scaleTargets.get(id);
-      if (slot == null || target === undefined) {
-        this.scaleFades.delete(id);
-        continue;
-      }
-      const die = this.slots[slot];
-      const t = duration <= 0 ? 1 : (now - fade.start) / duration;
-      if (t >= 1) {
-        die.scale = target;
-        this.writeMatrix(slot, now);
-        this.scaleFades.delete(id);
-      } else {
-        const e = 1 - Math.pow(1 - t, 3);
-        die.scale = fade.from + (target - fade.from) * e;
-        this.writeMatrix(slot, now);
-        active = true;
-      }
-    }
-    return active;
-  }
-
   private groupHighlighted(value: number): boolean {
     const group = this.groupsByValue.get(value) ?? [];
     if (group.length > 0) return group.every((d) => this.selected.has(d.id));
@@ -316,19 +273,16 @@ export class DiceRenderer {
     this.layout = layout(dice, this.maxPerRow, this.aspect);
     const now = performance.now();
     for (const die of dice) {
-      const slot = this.idSlot.get(die.id);
-      if (slot == null) continue;
+      if (this.dragOffsets.has(die.id)) continue;
       const position = this.layout.positions.get(die.id);
-      if (position) {
-        this.slots[slot].x = position.x;
-        this.slots[slot].y = position.y;
-      }
+      if (!position) continue;
+      this.setTarget(die.id, { x: position.x, y: position.y });
     }
     this.prev = this.synced && this.lastState ? this.snapshots(this.lastState) : [];
     this.updatePlateGeometry();
     this.updatePlateHighlights();
     this.fitCamera(false);
-    this.writeStaticMatrices(now);
+    this.writeIdleMatrices(now);
   }
 
   private fitCamera(animated: boolean): void {
@@ -407,11 +361,6 @@ export class DiceRenderer {
     }
     const isInitial = !this.synced;
     this.synced = true;
-    const dragId = this.dragId;
-    const dragSolo = this.dragSolo;
-    const dragCursor = this.dragCursor;
-    this.captureDragForReset();
-    this.finalizeAnimation();
     this.hasDice = state.dice.length > 0;
 
     const layoutChanged = isInitial || this.layoutChanged(this.lastState?.dice ?? [], state.dice);
@@ -420,52 +369,90 @@ export class DiceRenderer {
 
     if (layoutChanged) {
       this.layout = layout(state.dice, this.maxPerRow, this.aspect);
-      const next = this.snapshots(state);
-      const transitions = computeTransitions(this.prev, next);
-      this.prev = next;
       this.updatePlateGeometry();
       this.fitCamera(!isInitial);
-      if (isInitial) {
-        this.populateInitial(state);
-      } else if (transitions.length > 0) {
-        this.animate(transitions, true);
-      }
     }
 
     const selectionChanged = this.reconcileSelection(state);
+
+    const now = performance.now();
+    if (isInitial) {
+      this.populateInitial(state);
+      this.writeAllMatrices(now);
+    } else {
+      this.applyStateTransitions(state, layoutChanged);
+    }
 
     if (selectionChanged && !layoutChanged && !isInitial && this.selected.size > 0) {
       vibrate('select');
     }
 
-    const now = performance.now();
-    this.writeStaticMatrices(now);
-    this.applyShake(now);
-
-    this.applyGrabbedScale();
-    this.updatePlateHighlights();
-    this.resetPendingDrag();
-
-    if (dragId) {
-      const slot = this.idSlot.get(dragId);
-      if (slot != null && !this.tweenIds.has(dragId)) {
-        this.dragSolo = dragSolo;
-        this.beginDrag(dragId);
-        this.dragCursor = dragCursor;
-        this.applyDragPositions();
-        this.applyGrabbedScale();
-      }
+    if (this.dragId != null && this.idSlot.get(this.dragId) == null) {
+      this.endDrag();
     }
 
-    if (this.shakeActive) this.ensureLoop();
+    this.writeIdleMatrices(now);
+    this.applyShake(now);
+    this.updatePlateHighlights();
     this.render();
   }
 
   private populateInitial(state: GameState): void {
     for (const die of state.dice) {
       const position = this.layout.positions.get(die.id);
-      const slot = this.allocateSlot(die.id, die.value, position?.x ?? 0, position?.y ?? 0);
-      this.slots[slot].scale = 1;
+      this.allocateSlot(die.id, die.value, position?.x ?? 0, position?.y ?? 0);
+    }
+  }
+
+  private applyStateTransitions(state: GameState, layoutChanged: boolean): void {
+    const sounds = new Set<SoundName>();
+    const vibrations = new Set<VibrationName>();
+    if (layoutChanged) {
+      const next = this.snapshots(state);
+      const transitions = computeTransitions(this.prev, next);
+      this.prev = next;
+      for (const transition of transitions) {
+        this.applyTransition(transition, sounds, vibrations);
+      }
+    }
+    for (const sound of sounds) playSound(sound);
+    for (const vibration of vibrations) vibrate(vibration);
+
+    for (const die of state.dice) {
+      if (this.dragOffsets.has(die.id)) continue;
+      const position = this.layout.positions.get(die.id);
+      if (!position) continue;
+      this.setTarget(die.id, { x: position.x, y: position.y, scale: 1 });
+    }
+  }
+
+  private applyTransition(
+    transition: Transition,
+    sounds: Set<SoundName>,
+    vibrations: Set<VibrationName>,
+  ): void {
+    if (transition.kind === 'appear') {
+      sounds.add('appear');
+      vibrations.add('add');
+      this.spawnDie(transition.id, transition.value, transition.x, transition.y);
+    } else if (transition.kind === 'remove') {
+      sounds.add('disappear');
+      vibrations.add('delete');
+      this.removeDie(transition.id);
+    } else if (transition.kind === 'change') {
+      const spin = transition.origin === 'roll' || transition.origin === 'reroll';
+      if (spin) {
+        sounds.add('roll');
+        vibrations.add('roll');
+      }
+      this.setTarget(transition.id, {
+        x: transition.toX,
+        y: transition.toY,
+        value: transition.toValue,
+        spin,
+      });
+    } else {
+      this.setTarget(transition.id, { x: transition.toX, y: transition.toY });
     }
   }
 
@@ -491,17 +478,98 @@ export class DiceRenderer {
   }
 
   private allocateSlot(id: DiceId, value: number, x: number, y: number): number {
+    const instance: DieInstance = {
+      id,
+      value,
+      x,
+      y,
+      scale: 1,
+      selected: false,
+      shakePhase: Math.random() * Math.PI * 2,
+      dying: false,
+      spin: 0,
+      tx: x,
+      ty: y,
+      tscale: 1,
+      tvalue: value,
+      mx: null,
+      my: null,
+      mscale: null,
+      mspin: null,
+      mvalue: null,
+    };
     let slot = this.freeSlots.pop();
     if (slot == null) {
       slot = this.slots.length;
-      this.slots.push({ id, value, x, y, scale: 1, selected: false, shakePhase: Math.random() * Math.PI * 2, dying: false });
+      this.slots.push(instance);
       this.ensureCapacity(this.slots.length);
       this.syncInstanceCount();
     } else {
-      this.slots[slot] = { id, value, x, y, scale: 1, selected: false, shakePhase: Math.random() * Math.PI * 2, dying: false };
+      this.slots[slot] = instance;
     }
     this.idSlot.set(id, slot);
     return slot;
+  }
+
+  private spawnDie(id: DiceId, value: number, x: number, y: number): void {
+    const slot = this.allocateSlot(id, value, x, y);
+    const die = this.slots[slot];
+    const now = performance.now();
+    die.scale = 0;
+    die.mscale = startMotion(0, 1, now, config.renderer.animationDurationMs);
+    die.mspin = startMotion(0, Math.PI * 2, now, config.renderer.animationDurationMs);
+    this.ensureLoop();
+  }
+
+  private removeDie(id: DiceId): void {
+    const slot = this.idSlot.get(id);
+    if (slot == null) return;
+    const die = this.slots[slot];
+    die.dying = true;
+    die.tscale = 0;
+    die.mscale = startMotion(die.scale, 0, performance.now(), config.renderer.animationDurationMs);
+    this.ensureLoop();
+  }
+
+  private freeSlot(slot: number, die: DieInstance): void {
+    die.scale = 0;
+    die.dying = false;
+    die.selected = false;
+    this.idSlot.delete(die.id);
+    this.freeSlots.push(slot);
+    this.writeMatrix(slot, performance.now());
+  }
+
+  private setTarget(
+    id: DiceId,
+    patch: { x?: number; y?: number; scale?: number; value?: number; spin?: boolean },
+  ): void {
+    const slot = this.idSlot.get(id);
+    if (slot == null) return;
+    const die = this.slots[slot];
+    const now = performance.now();
+    if (patch.x !== undefined && patch.x !== die.tx) {
+      die.tx = patch.x;
+      die.mx = startMotion(die.x, die.tx, now, config.renderer.animationDurationMs);
+    }
+    if (patch.y !== undefined && patch.y !== die.ty) {
+      die.ty = patch.y;
+      die.my = startMotion(die.y, die.ty, now, config.renderer.animationDurationMs);
+    }
+    if (patch.scale !== undefined && patch.scale !== die.tscale) {
+      die.tscale = patch.scale;
+      die.mscale = startMotion(die.scale, die.tscale, now, config.renderer.grabAnimMs);
+    }
+    if (patch.value !== undefined && patch.value !== die.tvalue) {
+      die.tvalue = patch.value;
+      if (die.value !== die.tvalue) {
+        die.mvalue = startMotion(0, 1, now, config.renderer.animationDurationMs);
+      }
+    }
+    if (patch.spin) {
+      die.mspin = startMotion(die.spin, Math.PI * 2, now, config.renderer.animationDurationMs);
+    }
+    this.ensureLoop();
   }
 
   private syncInstanceCount(): void {
@@ -532,147 +600,6 @@ export class DiceRenderer {
     this.dirty = true;
   }
 
-  private animate(transitions: Transition[], playAudio: boolean): void {
-    if (playAudio) {
-      const sounds = new Set<SoundName>();
-      for (const transition of transitions) {
-        if (transition.kind === 'appear') sounds.add('appear');
-        else if (transition.kind === 'remove') sounds.add('disappear');
-        else if (transition.kind === 'change' && (transition.origin === 'roll' || transition.origin === 'reroll'))
-          sounds.add('roll');
-      }
-      for (const sound of sounds) playSound(sound);
-    }
-
-    const vibrations = new Set<VibrationName>();
-    for (const transition of transitions) {
-      if (transition.kind === 'appear') vibrations.add('add');
-      else if (transition.kind === 'remove') vibrations.add('delete');
-      else if (transition.kind === 'change' && (transition.origin === 'roll' || transition.origin === 'reroll'))
-        vibrations.add('roll');
-    }
-    for (const vibration of vibrations) vibrate(vibration);
-
-    const tweens: Tween[] = [];
-    for (const transition of transitions) {
-      if (transition.kind === 'appear') {
-        const slot = this.allocateSlot(transition.id, transition.value, transition.x, transition.y);
-        this.slots[slot].scale = 0;
-        tweens.push({ kind: 'appear', id: transition.id });
-      } else if (transition.kind === 'remove') {
-        const slot = this.idSlot.get(transition.id);
-        if (slot == null) continue;
-        this.slots[slot].dying = true;
-        tweens.push({ kind: 'remove', id: transition.id });
-      } else if (transition.kind === 'slide') {
-        const slot = this.idSlot.get(transition.id);
-        if (slot == null) continue;
-        const die = this.slots[slot];
-        tweens.push({
-          kind: 'slide',
-          id: transition.id,
-          fromX: die.x,
-          fromY: die.y,
-          toX: transition.toX,
-          toY: transition.toY,
-        });
-      } else {
-        let slot = this.idSlot.get(transition.id);
-        if (slot == null) slot = this.allocateSlot(transition.id, transition.fromValue, transition.fromX, transition.fromY);
-        const die = this.slots[slot];
-        die.value = transition.fromValue;
-        tweens.push({
-          kind: 'change',
-          id: transition.id,
-          fromX: die.x,
-          fromY: die.y,
-          toX: transition.toX,
-          toY: transition.toY,
-          fromValue: transition.fromValue,
-          toValue: transition.toValue,
-          valueApplied: false,
-          spin: transition.origin === 'roll' || transition.origin === 'reroll',
-        });
-      }
-    }
-
-    for (const tween of tweens) this.tweenIds.add(tween.id);
-    this.tweens = tweens;
-    this.tweenStart = performance.now();
-    if (this.tweens.length > 0) this.ensureLoop();
-  }
-
-  private stepTweens(now: number): void {
-    if (this.tweens.length === 0) return;
-    const t = Math.min(1, (now - this.tweenStart) / config.renderer.animationDurationMs);
-    const e = 1 - Math.pow(1 - t, 3);
-
-    for (const tween of this.tweens) {
-      const slot = this.idSlot.get(tween.id);
-      if (slot == null) continue;
-      const die = this.slots[slot];
-      if (tween.kind === 'appear') {
-        die.scale = e;
-        this.writeMatrix(slot, now, e * Math.PI * 2, e * Math.PI * 2);
-      } else if (tween.kind === 'remove') {
-        die.scale = 1 - e;
-        this.writeMatrix(slot, now);
-      } else if (tween.kind === 'slide') {
-        die.x = tween.fromX + (tween.toX - tween.fromX) * e;
-        die.y = tween.fromY + (tween.toY - tween.fromY) * e;
-        this.writeMatrix(slot, now);
-      } else {
-        die.x = tween.fromX + (tween.toX - tween.fromX) * e;
-        die.y = tween.fromY + (tween.toY - tween.fromY) * e;
-        if (tween.spin) this.writeMatrix(slot, now, e * Math.PI * 2, e * Math.PI * 2);
-        else this.writeMatrix(slot, now);
-        if (!tween.valueApplied && t >= 0.5) {
-          die.value = tween.toValue;
-          tween.valueApplied = true;
-        }
-      }
-    }
-
-    if (t >= 1) this.finalizeAnimation();
-  }
-
-  private finalizeAnimation(): void {
-    const now = performance.now();
-    for (const tween of this.tweens) {
-      const slot = this.idSlot.get(tween.id);
-      if (tween.kind === 'appear') {
-        if (slot == null) continue;
-        this.slots[slot].scale = 1;
-        this.writeMatrix(slot, now);
-      } else if (tween.kind === 'remove') {
-        if (slot == null) continue;
-        const die = this.slots[slot];
-        die.scale = 0;
-        die.dying = false;
-        die.selected = false;
-        this.idSlot.delete(tween.id);
-        this.freeSlots.push(slot);
-        this.writeMatrix(slot, now);
-      } else if (tween.kind === 'slide') {
-        if (slot == null) continue;
-        const die = this.slots[slot];
-        die.x = tween.toX;
-        die.y = tween.toY;
-        this.writeMatrix(slot, now);
-      } else {
-        if (slot == null) continue;
-        const die = this.slots[slot];
-        die.x = tween.toX;
-        die.y = tween.toY;
-        die.value = tween.toValue;
-        die.scale = 1;
-        this.writeMatrix(slot, now);
-      }
-    }
-    this.tweens = [];
-    this.tweenIds.clear();
-  }
-
   private reconcileSelection(state: GameState): boolean {
     const prev = this.selected;
     const next = new Set<DiceId>();
@@ -695,11 +622,11 @@ export class DiceRenderer {
     return changed;
   }
 
-  private writeStaticMatrices(now: number): void {
+  private writeIdleMatrices(now: number): void {
     for (let i = 0; i < this.slots.length; i++) {
       const die = this.slots[i];
       if (this.idSlot.get(die.id) !== i) continue;
-      if (die.selected || this.tweenIds.has(die.id)) continue;
+      if (die.mx || die.my || die.mscale || die.mspin || die.mvalue) continue;
       this.writeMatrix(i, now);
     }
   }
@@ -719,7 +646,7 @@ export class DiceRenderer {
       this.shakeActive = shaking;
       for (const id of this.selected) {
         const slot = this.idSlot.get(id);
-        if (slot == null || this.tweenIds.has(id)) continue;
+        if (slot == null) continue;
         this.writeMatrix(slot, now);
       }
     }
@@ -765,17 +692,16 @@ export class DiceRenderer {
     if (!cursor) return;
     this.dragSolo = drag.solo ?? false;
     if (this.dragId !== drag.id) this.beginDrag(drag.id);
-    this.dragCursor = { x: cursor.x, y: cursor.y };
     this.dragTarget = drag.target ?? null;
-    this.applyDragPositions();
+    for (const [id, offset] of this.dragOffsets) {
+      this.dragFollow(id, cursor.x + offset.x, cursor.y + offset.y);
+    }
     this.updatePlateHighlights();
     this.render();
   }
 
   private beginDrag(id: DiceId): void {
     this.dragId = id;
-    this.dragStartTime = performance.now();
-    this.dragStartPositions.clear();
     const group = this.dragGroupIds();
     const n = group.length;
     const cols = Math.max(1, Math.ceil(Math.sqrt(n)));
@@ -788,13 +714,8 @@ export class DiceRenderer {
       const row = Math.floor(i / cols);
       const offset = { x: startX + col * spacing, y: startY - row * spacing };
       this.dragOffsets.set(group[i], offset);
-      const slot = this.idSlot.get(group[i]);
-      if (slot != null) {
-        const die = this.slots[slot];
-        this.dragStartPositions.set(group[i], { x: die.x, y: die.y });
-      }
+      this.setTarget(group[i], { scale: config.renderer.grabScale });
     }
-    this.applyGrabbedScale();
   }
 
   private dragGroupIds(): DiceId[] {
@@ -808,111 +729,31 @@ export class DiceRenderer {
     return ids;
   }
 
-  private applyDragPositions(): void {
-    if (!this.dragCursor) return;
-    const now = performance.now();
-    if (this.dragStartTime !== null) {
-      const elapsed = now - this.dragStartTime;
-      if (elapsed < this.CATCH_UP_MS) {
-        const t = elapsed / this.CATCH_UP_MS;
-        const ease = 1 - Math.pow(1 - t, 3);
-        for (const [id, offset] of this.dragOffsets) {
-          const slot = this.idSlot.get(id);
-          if (slot == null) continue;
-          const die = this.slots[slot];
-          const start = this.dragStartPositions.get(id);
-          if (!start) continue;
-          die.x = start.x + (this.dragCursor.x + offset.x - start.x) * ease;
-          die.y = start.y + (this.dragCursor.y + offset.y - start.y) * ease;
-          this.writeMatrix(slot, now);
-        }
-        return;
-      }
-      // Catch-up phase finished, clear start time
-      this.dragStartTime = null;
-    }
-    // After catch-up or if not started
-    for (const [id, offset] of this.dragOffsets) {
-      const slot = this.idSlot.get(id);
-      if (slot == null) continue;
-      const die = this.slots[slot];
-      die.x = this.dragCursor.x + offset.x;
-      die.y = this.dragCursor.y + offset.y;
-      this.writeMatrix(slot, now);
-    }
-  }
-
-  private endDrag(): void {
-    this.slideToLayout(this.dragOffsets.keys());
-    this.dragId = null;
-    this.dragOffsets.clear();
-    this.dragStartTime = null;
-    this.dragStartPositions.clear();
-    this.dragCursor = null;
-    this.dragSolo = false;
-    this.dragTarget = null;
-    this.applyGrabbedScale();
-    this.updatePlateHighlights();
-    this.render();
-  }
-
-  private captureDragForReset(): void {
-    for (const id of this.dragOffsets.keys()) this.pendingDragReset.add(id);
-    this.dragId = null;
-    this.dragOffsets.clear();
-    this.dragStartTime = null;
-    this.dragStartPositions.clear();
-    this.dragCursor = null;
-    this.dragSolo = false;
-    this.dragTarget = null;
-  }
-
-  private resetPendingDrag(): void {
-    this.slideToLayout(this.pendingDragReset);
-    this.pendingDragReset.clear();
-  }
-
-  private slideToLayout(ids: Iterable<DiceId>): void {
-    const wasEmpty = this.tweens.length === 0;
-    for (const id of ids) {
-      if (this.tweenIds.has(id)) continue;
-      const slot = this.idSlot.get(id);
-      if (slot == null) continue;
-      const position = this.layout.positions.get(id);
-      if (!position) continue;
-      const die = this.slots[slot];
-      if (die.x === position.x && die.y === position.y) continue;
-      this.tweens.push({ kind: 'slide', id, fromX: die.x, fromY: die.y, toX: position.x, toY: position.y });
-      this.tweenIds.add(id);
-    }
-    if (wasEmpty && this.tweens.length > 0) this.tweenStart = performance.now();
-    if (this.tweens.length > 0) this.ensureLoop();
-  }
-
-  private applyGrabbedScale(): void {
-    const now = performance.now();
-    for (let i = 0; i < this.slots.length; i++) {
-      const die = this.slots[i];
-      if (this.idSlot.get(die.id) !== i) continue;
-      if (this.tweenIds.has(die.id)) continue;
-      const target = this.dragOffsets.has(die.id) ? config.renderer.grabScale : 1;
-      this.setDieScale(die.id, target, now);
-    }
-  }
-
-  private setDieScale(id: DiceId, target: number, now: number): void {
+  private dragFollow(id: DiceId, x: number, y: number): void {
     const slot = this.idSlot.get(id);
     if (slot == null) return;
     const die = this.slots[slot];
-    if (die.scale === target) {
-      this.scaleFades.delete(id);
-      this.scaleTargets.set(id, target);
-      return;
-    }
-    if (this.scaleTargets.get(id) === target) return;
-    this.scaleTargets.set(id, target);
-    this.scaleFades.set(id, { from: die.scale, start: now });
+    const now = performance.now();
+    die.tx = x;
+    die.ty = y;
+    die.mx = startMotion(die.x, x, now, config.renderer.dragFollowMs);
+    die.my = startMotion(die.y, y, now, config.renderer.dragFollowMs);
     this.ensureLoop();
+  }
+
+  private endDrag(): void {
+    const ids = [...this.dragOffsets.keys()];
+    this.dragId = null;
+    this.dragOffsets.clear();
+    this.dragSolo = false;
+    this.dragTarget = null;
+    for (const id of ids) {
+      const position = this.layout.positions.get(id);
+      if (position) this.setTarget(id, { x: position.x, y: position.y, scale: 1 });
+      else this.setTarget(id, { scale: 1 });
+    }
+    this.updatePlateHighlights();
+    this.render();
   }
 
   private cursorWorld(clientX: number, clientY: number): { x: number; y: number } | null {
@@ -925,15 +766,70 @@ export class DiceRenderer {
     if (this.rafId === null) this.rafId = requestAnimationFrame(this.tick);
   }
 
+  private advanceDiceMotions(now: number): boolean {
+    let active = false;
+    for (let i = 0; i < this.slots.length; i++) {
+      const die = this.slots[i];
+      if (this.idSlot.get(die.id) !== i) continue;
+      const moving = !!(die.mx || die.my || die.mscale || die.mspin || die.mvalue);
+      if (moving) {
+        this.advanceDie(die, now);
+        this.writeMatrix(i, now, die.spin, die.spin);
+      }
+      if (die.mx || die.my || die.mscale || die.mspin || die.mvalue) active = true;
+      if (die.dying && !die.mscale && die.scale <= 0) this.freeSlot(i, die);
+    }
+    return active;
+  }
+
+  private advanceDie(die: DieInstance, now: number): void {
+    if (die.mx) {
+      if (motionDone(die.mx, now)) {
+        die.x = die.mx.to;
+        die.mx = null;
+      } else {
+        die.x = motionValue(die.mx, now);
+      }
+    }
+    if (die.my) {
+      if (motionDone(die.my, now)) {
+        die.y = die.my.to;
+        die.my = null;
+      } else {
+        die.y = motionValue(die.my, now);
+      }
+    }
+    if (die.mscale) {
+      if (motionDone(die.mscale, now)) {
+        die.scale = die.mscale.to;
+        die.mscale = null;
+      } else {
+        die.scale = motionValue(die.mscale, now);
+      }
+    }
+    if (die.mspin) {
+      if (motionDone(die.mspin, now)) {
+        die.spin = 0;
+        die.mspin = null;
+      } else {
+        die.spin = motionValue(die.mspin, now);
+      }
+    }
+    if (die.mvalue) {
+      const p = motionProgress(die.mvalue, now);
+      if (die.value !== die.tvalue && p >= 0.5) die.value = die.tvalue;
+      if (motionDone(die.mvalue, now)) die.mvalue = null;
+    }
+  }
+
   private tick = (now: number) => {
-    this.stepTweens(now);
+    const motion = this.advanceDiceMotions(now);
     this.applyShake(now);
     const camera = this.stepCamera(now);
     const fading = this.stepPlateFade(now);
-    const scaling = this.stepScaleFade(now);
     this.render();
 
-    const active = this.tweens.length > 0 || this.shakeActive || fading || scaling || camera;
+    const active = motion || this.shakeActive || fading || camera;
     this.rafId = active ? requestAnimationFrame(this.tick) : null;
   };
 
@@ -984,7 +880,6 @@ export class DiceRenderer {
 
   dispose(): void {
     if (this.rafId !== null) cancelAnimationFrame(this.rafId);
-    this.finalizeAnimation();
     this.resizeObserver.disconnect();
     for (const mesh of this.instanced) mesh.dispose();
     this.pixelPass?.dispose();
