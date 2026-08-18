@@ -26,7 +26,6 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
   let lastAction: string | null = null;
   let inTransaction = false;
   let transactionPushed = false;
-  let transactionDirty = false;
 
   function notify(): void {
     for (const listener of listeners) {
@@ -51,7 +50,6 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
         redoStack = [];
         transactionPushed = true;
       }
-      if (isMod) transactionDirty = true;
     } else if (!coalesce) {
       undoStack.push(state);
       redoStack = [];
@@ -102,16 +100,11 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
     beginTransaction() {
       inTransaction = true;
       transactionPushed = false;
-      transactionDirty = false;
       lastAction = null;
     },
     endTransaction() {
       inTransaction = false;
       transactionPushed = false;
-      if (transactionDirty) {
-        state = { ...state, rememberedValues: [] };
-      }
-      transactionDirty = false;
       lastAction = null;
     },
     restore(restored: GameState) {

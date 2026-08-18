@@ -190,7 +190,7 @@ describe('engine', () => {
     engine.dispatch({ type: 'add', count: 2 });
     expect(engine.canUndo()).toBe(true);
 
-    engine.restore({ dice: [], history: [], swipeAddAvailable: false, rememberedValues: [], selection: noneSelection });
+    engine.restore({ dice: [], history: [], swipeAddAvailable: false, selection: noneSelection });
     expect(engine.getState().dice).toHaveLength(0);
     expect(engine.getState().swipeAddAvailable).toBe(false);
     expect(engine.canUndo()).toBe(false);

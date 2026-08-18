@@ -28,7 +28,7 @@ function ids(...values: string[]): Selection {
 const rand = (v: number) => (v - 1) / 6;
 
 function stateWith(dice: Die[], selection: Selection = noneSelection): GameState {
-  return { dice, history: [], swipeAddAvailable: false, rememberedValues: [], selection };
+  return { dice, history: [], swipeAddAvailable: false, selection };
 }
 
 describe('add', () => {
@@ -51,6 +51,15 @@ describe('add', () => {
   it('fills missing explicit values with random', () => {
     const state = reduce(createInitialState(), { type: 'add', count: 2, values: [5] }, makeDeps([rand(4)]));
     expect(state.dice.map((d) => d.value)).toEqual([5, 4]);
+  });
+
+  it('replaces invalid explicit values with fresh D6 rolls', () => {
+    const state = reduce(
+      createInitialState(),
+      { type: 'add', count: 5, values: [0, 7, 2.5, Number.NaN, 4] },
+      makeDeps([rand(1), rand(2), rand(3), rand(5)]),
+    );
+    expect(state.dice.map((d) => d.value)).toEqual([1, 2, 3, 5, 4]);
   });
 
   it('clears the existing selection', () => {
@@ -81,62 +90,13 @@ describe('delete', () => {
   });
 });
 
-describe('value memory', () => {
-  it('re-adds a die with the last deleted value (LIFO)', () => {
-    const deps = makeDeps([rand(6), rand(3), rand(5)]);
-    let state = reduce(createInitialState(), { type: 'add', count: 3 }, deps);
-    state = reduce(state, { type: 'delete', count: 2 }, deps);
-    state = reduce(state, { type: 'add', count: 1 }, deps);
-    expect(state.dice.map((d) => d.value)).toEqual([6, 5]);
-  });
-
-  it('restores all deleted values across multiple adds', () => {
-    const deps = makeDeps([rand(6), rand(3), rand(5)]);
-    let state = reduce(createInitialState(), { type: 'add', count: 3 }, deps);
-    state = reduce(state, { type: 'delete', count: 2 }, deps);
-    state = reduce(state, { type: 'add', count: 2 }, deps);
-    expect(state.dice.map((d) => d.value)).toEqual([6, 5, 3]);
-  });
-
-  it('rolls fresh once the memory is exhausted', () => {
+describe('ordinary add and delete', () => {
+  it('rolls a fresh value after deleting a die', () => {
     const deps = makeDeps([rand(6), rand(3), rand(5)]);
     let state = reduce(createInitialState(), { type: 'add', count: 2 }, deps);
     state = reduce(state, { type: 'delete', count: 1 }, deps);
-    state = reduce(state, { type: 'add', count: 2 }, deps);
-    expect(state.dice.map((d) => d.value)).toEqual([6, 3, 5]);
-  });
-
-  it('remembers values of deleted selected dice', () => {
-    const state = stateWith([die('a', 1), die('b', 2), die('c', 3)], ids('a', 'c'));
-    const next = reduce(state, { type: 'delete' }, makeDeps([]));
-    expect(next.rememberedValues).toEqual([1, 3]);
-  });
-
-  it('explicit values bypass the memory', () => {
-    const state = { ...stateWith([]), rememberedValues: [5, 4] };
-    const next = reduce(state, { type: 'add', count: 2, values: [6, 2] }, makeDeps([]));
-    expect(next.dice.map((d) => d.value)).toEqual([6, 2]);
-    expect(next.rememberedValues).toEqual([5, 4]);
-  });
-
-  it('roll resets the memory', () => {
-    let state = { ...stateWith([die('a', 1), die('b', 2)]), rememberedValues: [5, 4] };
-    state = reduce(state, { type: 'select', ids: ['a'], mode: 'set' }, makeDeps([]));
-    const next = reduce(state, { type: 'roll' }, makeDeps([rand(6)]));
-    expect(next.rememberedValues).toEqual([]);
-  });
-
-  it('reroll resets the memory', () => {
-    const state = { ...stateWith([die('a', 1), die('b', 2)]), rememberedValues: [5, 4] };
-    const next = reduce(state, { type: 'reroll' }, makeDeps([rand(6), rand(3)]));
-    expect(next.rememberedValues).toEqual([]);
-  });
-
-  it('clear resets the memory', () => {
-    const state = { ...stateWith([die('a', 1)]), rememberedValues: [5, 4] };
-    const next = reduce(state, { type: 'clear' }, makeDeps([]));
-    expect(next.rememberedValues).toEqual([]);
-    expect(next.swipeAddAvailable).toBe(true);
+    state = reduce(state, { type: 'add', count: 1 }, deps);
+    expect(state.dice.map((d) => d.value)).toEqual([6, 5]);
   });
 });
 
@@ -182,6 +142,11 @@ describe('move', () => {
     expect(next.dice.find((d) => d.id === 'a')?.value).toBe(5);
     expect(next.dice.find((d) => d.id === 'a')?.origin).toBe('move');
     expect(next.dice.find((d) => d.id === 'b')?.value).toBe(2);
+  });
+
+  it('ignores invalid target values', () => {
+    const state = stateWith([die('a', 1)], ids('a'));
+    expect(reduce(state, { type: 'move', targetValue: 7 }, makeDeps([]))).toBe(state);
   });
 });
 

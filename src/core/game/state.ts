@@ -1,4 +1,4 @@
-import type { Die } from '../dice/types';
+import { isD6Value, type Die } from '../dice/types';
 import type { HistoryEntry } from '../history/types';
 import type { Selection } from '../selection/selection';
 import { noneSelection } from '../selection/selection';
@@ -7,7 +7,6 @@ export interface GameState {
   dice: Die[];
   history: HistoryEntry[];
   swipeAddAvailable: boolean;
-  rememberedValues: number[];
   selection: Selection;
 }
 
@@ -16,7 +15,6 @@ export function createInitialState(): GameState {
     dice: [],
     history: [],
     swipeAddAvailable: true,
-    rememberedValues: [],
     selection: noneSelection,
   };
 }
@@ -29,14 +27,10 @@ interface LegacyState {
   dice?: LegacyDie[];
   history?: HistoryEntry[];
   swipeAddAvailable?: boolean;
-  rememberedValues?: number[];
   selectedGroups?: { min: number; max: number } | null;
 }
 
 export function normalizeState(raw: GameState | LegacyState): GameState {
-  if ('selection' in raw && raw.selection && typeof (raw.selection as Selection).kind === 'string') {
-    return { ...createInitialState(), ...(raw as GameState) };
-  }
   const legacy = raw as LegacyState;
   const legacyDice = legacy.dice ?? [];
   let selection: Selection;
@@ -51,7 +45,7 @@ export function normalizeState(raw: GameState | LegacyState): GameState {
   }
   return {
     ...createInitialState(),
-    dice: legacyDice.map((die) => ({
+    dice: legacyDice.filter((die) => isD6Value(die.value)).map((die) => ({
       id: die.id,
       type: die.type,
       value: die.value,
@@ -59,7 +53,8 @@ export function normalizeState(raw: GameState | LegacyState): GameState {
     })),
     history: legacy.history ?? [],
     swipeAddAvailable: legacy.swipeAddAvailable ?? true,
-    rememberedValues: legacy.rememberedValues ?? [],
-    selection,
+    selection: 'selection' in raw && raw.selection && typeof (raw.selection as Selection).kind === 'string'
+      ? (raw.selection as Selection)
+      : selection,
   };
 }

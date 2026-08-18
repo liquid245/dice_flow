@@ -1,4 +1,4 @@
-import type { Die } from '../dice/types';
+import { isD6Value, type Die } from '../dice/types';
 import { rollD6 } from '../dice/roll';
 import type { GameAction, SelectMode } from '../actions/types';
 import type { GameState } from './state';
@@ -28,17 +28,10 @@ export function reduce(state: GameState, action: GameAction, deps: EngineDeps): 
 
 function addDice(state: GameState, count: number, values: number[] | undefined, deps: EngineDeps): GameState {
   if (count <= 0) return state;
-  const memory = [...(state.rememberedValues ?? [])];
   const added: Die[] = [];
   for (let i = 0; i < count; i++) {
-    let value: number;
-    if (values && i < values.length) {
-      value = values[i];
-    } else if (memory.length > 0) {
-      value = memory.pop() as number;
-    } else {
-      value = rollD6(deps.random);
-    }
+    const explicitValue = values?.[i];
+    const value = isD6Value(explicitValue) ? explicitValue : rollD6(deps.random);
     added.push({
       id: deps.nextId(),
       type: 'd6',
@@ -50,32 +43,25 @@ function addDice(state: GameState, count: number, values: number[] | undefined, 
     ...state,
     dice: [...state.dice, ...added],
     swipeAddAvailable: false,
-    rememberedValues: memory,
     selection: noneSelection,
   };
 }
 
 function deleteDice(state: GameState, count: number | undefined): GameState {
   const selected = selectedDice(state.dice, state.selection);
-  let deleted: Die[];
   let remaining: Die[];
   if (selected.length > 0) {
     const ids = new Set(selected.map((d) => d.id));
-    deleted = selected;
     remaining = state.dice.filter((d) => !ids.has(d.id));
   } else {
     const n = Math.max(0, count ?? 1);
     if (n === 0 || state.dice.length === 0) return state;
-    deleted = state.dice.slice(state.dice.length - n);
     remaining = state.dice.slice(0, state.dice.length - n);
   }
-  const memory = [...(state.rememberedValues ?? [])];
-  for (const die of deleted) memory.push(die.value);
   return {
     ...state,
     dice: remaining,
     swipeAddAvailable: false,
-    rememberedValues: memory,
     selection: noneSelection,
   };
 }
@@ -87,7 +73,7 @@ function roll(state: GameState, deps: EngineDeps): GameState {
   const dice: Die[] = state.dice
     .filter((d) => ids.has(d.id))
     .map((d) => ({ ...d, value: rollD6(deps.random), origin: 'roll' as const }));
-  return { ...state, dice, rememberedValues: [], selection: noneSelection };
+  return { ...state, dice, selection: noneSelection };
 }
 
 function reroll(state: GameState, deps: EngineDeps): GameState {
@@ -99,10 +85,11 @@ function reroll(state: GameState, deps: EngineDeps): GameState {
   const dice: Die[] = state.dice.map((d) =>
     ids.has(d.id) ? { ...d, value: rollD6(deps.random), origin: 'reroll' as const } : d,
   );
-  return { ...state, dice, rememberedValues: [], selection: noneSelection };
+  return { ...state, dice, selection: noneSelection };
 }
 
 function move(state: GameState, targetValue: number): GameState {
+  if (!isD6Value(targetValue)) return state;
   const selected = selectedDice(state.dice, state.selection);
   if (selected.length === 0) return state;
   const ids = new Set(selected.map((d) => d.id));
@@ -151,5 +138,5 @@ function selectGroupRange(state: GameState, min: number, max: number): GameState
 }
 
 function clear(state: GameState): GameState {
-  return { ...state, dice: [], swipeAddAvailable: true, rememberedValues: [], selection: noneSelection };
+  return { ...state, dice: [], swipeAddAvailable: true, selection: noneSelection };
 }

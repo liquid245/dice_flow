@@ -5,7 +5,7 @@ import { initPersistence, type PersistableEngine } from './persistence';
 import type { GameStorage } from './storage';
 
 function empty(): GameState {
-  return { dice: [], history: [], swipeAddAvailable: true, rememberedValues: [], selection: noneSelection };
+  return { dice: [], history: [], swipeAddAvailable: true, selection: noneSelection };
 }
 
 function fakeEngine(initial: GameState): PersistableEngine & { emit(): void; setState(state: GameState): void } {
@@ -46,7 +46,7 @@ describe('initPersistence', () => {
   });
 
   it('restores the saved state on init', async () => {
-    const saved = { dice: [], history: [], swipeAddAvailable: false, rememberedValues: [], selection: noneSelection };
+    const saved = { dice: [], history: [], swipeAddAvailable: false, selection: noneSelection };
     const engine = fakeEngine(empty());
     const storage = fakeStorage(saved);
 

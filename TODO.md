@@ -63,7 +63,7 @@ AI не должен самостоятельно расширять задач�
 ## Движок (Core)
 
 - [x] Определить типы кубика (src/core/dice/types.ts): DiceId = string; DiceType = 'd6'; OperationKind = 'roll' | 'reroll' | 'add' | 'move'; Die { id, type, value, selected, origin }
-- [x] Определить GameState (src/core/game/state.ts): { dice: Die[]; history: HistoryEntry[]; swipeAddAvailable: boolean; rememberedValues: number[] }
+- [x] Определить GameState (src/core/game/state.ts): { dice: Die[]; history: HistoryEntry[]; swipeAddAvailable: boolean; selection }
 - [x] Определить EngineDeps { random, nextId, now } и Action union (src/core/actions/types.ts): roll | reroll | add{count, values?} | delete{count?} | move{targetValue} | select{ids, mode} | clear | undo | redo
 - [x] Реализовать чистую функцию reduce(state, action, deps) (src/core/game/reducer.ts)
 - [x] Реализовать add: случайные значения (+N), опциональные явные значения для восстановления при свайпе + тесты
@@ -75,7 +75,7 @@ AI не должен самостоятельно расширять задач�
 - [x] Реализовать clear: очистка стола + swipeAddAvailable = true + тесты
 - [x] Реализовать undo/redo: навигация по истории действий (все действия отменяемы, кроме выбора), коалесцирование одинаковых действий + тесты
 - [x] Реализовать History: плоский лог всех действий (roll/reroll/add/delete/move/clear; выбор не логируется) + тесты
-- [x] Реализовать память значений удалённых кубиков (LIFO) + сброс по roll/reroll/clear + тесты
+- [x] Ограничить память значений активным SwipeAddSession; обычные Add/Delete всегда используют новые броски + тесты
 - [x] Сворачивать последовательность Add/Delete в одну net-запись истории + тесты
 - [x] Реализовать селекторы: groupByValue, selectedDice, counts + тесты
 - [x] Реализовать движок createEngine: dispatch, subscribe, canUndo/canRedo, beginTransaction/endTransaction + тесты
