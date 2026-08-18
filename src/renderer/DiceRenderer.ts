@@ -83,6 +83,9 @@ export class DiceRenderer {
   private dragCursor: { x: number; y: number } | null = null;
   private dragTarget: number | null = null;
   private pendingDragReset = new Set<DiceId>();
+  private dragStartTime: number | null = null;
+  private dragStartPositions = new Map<DiceId, { x: number; y: number }>();
+  private readonly CATCH_UP_MS = 150;
 
   private plateTargets = new Map<number, number>();
   private plateFades = new Map<number, { from: number; start: number }>();
@@ -729,6 +732,8 @@ export class DiceRenderer {
 
   private beginDrag(id: DiceId): void {
     this.dragId = id;
+    this.dragStartTime = performance.now();
+    this.dragStartPositions.clear();
     const group = this.dragGroupIds();
     const n = group.length;
     const cols = Math.max(1, Math.ceil(Math.sqrt(n)));
@@ -739,7 +744,13 @@ export class DiceRenderer {
     for (let i = 0; i < n; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
-      this.dragOffsets.set(group[i], { x: startX + col * spacing, y: startY - row * spacing });
+      const offset = { x: startX + col * spacing, y: startY - row * spacing };
+      this.dragOffsets.set(group[i], offset);
+      const slot = this.idSlot.get(group[i]);
+      if (slot != null) {
+        const die = this.slots[slot];
+        this.dragStartPositions.set(group[i], { x: die.x, y: die.y });
+      }
     }
     this.applyGrabbedScale();
   }
@@ -758,6 +769,27 @@ export class DiceRenderer {
   private applyDragPositions(): void {
     if (!this.dragCursor) return;
     const now = performance.now();
+    if (this.dragStartTime !== null) {
+      const elapsed = now - this.dragStartTime;
+      if (elapsed < this.CATCH_UP_MS) {
+        const t = elapsed / this.CATCH_UP_MS;
+        const ease = 1 - Math.pow(1 - t, 3);
+        for (const [id, offset] of this.dragOffsets) {
+          const slot = this.idSlot.get(id);
+          if (slot == null) continue;
+          const die = this.slots[slot];
+          const start = this.dragStartPositions.get(id);
+          if (!start) continue;
+          die.x = start.x + (this.dragCursor.x + offset.x - start.x) * ease;
+          die.y = start.y + (this.dragCursor.y + offset.y - start.y) * ease;
+          this.writeMatrix(slot, now);
+        }
+        return;
+      }
+      // Catch-up phase finished, clear start time
+      this.dragStartTime = null;
+    }
+    // After catch-up or if not started
     for (const [id, offset] of this.dragOffsets) {
       const slot = this.idSlot.get(id);
       if (slot == null) continue;
@@ -781,6 +813,8 @@ export class DiceRenderer {
     }
     this.dragId = null;
     this.dragOffsets.clear();
+    this.dragStartTime = null;
+    this.dragStartPositions.clear();
     this.dragCursor = null;
     this.dragSolo = false;
     this.dragTarget = null;
@@ -793,6 +827,8 @@ export class DiceRenderer {
     for (const id of this.dragOffsets.keys()) this.pendingDragReset.add(id);
     this.dragId = null;
     this.dragOffsets.clear();
+    this.dragStartTime = null;
+    this.dragStartPositions.clear();
     this.dragCursor = null;
     this.dragSolo = false;
     this.dragTarget = null;
