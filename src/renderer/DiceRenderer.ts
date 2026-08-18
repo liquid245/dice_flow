@@ -50,11 +50,12 @@ export class DiceRenderer {
   private composer: EffectComposer | null = null;
   private pixelPass: RenderPixelatedPass | null = null;
   private raycaster = new THREE.Raycaster();
-  private resizeObserver: ResizeObserver;
+  private currentSize = { width: 0, height: 0 };
   private materialGroups: LodGroup[] = [];
   private instanced: THREE.InstancedMesh[] = [];
   private capacity = DEFAULT_CAPACITY;
   private ready = false;
+  private currentSize = { width: 0, height: 0 };
 
   private slots: DieInstance[] = [];
   private idSlot = new Map<DiceId, number>();
@@ -292,8 +293,8 @@ export class DiceRenderer {
   resize(): void {
     const width = this.container.clientWidth || 1;
     const height = this.container.clientHeight || 1;
-    this.renderer.setSize(width, height, false);
-    this.composer?.setSize(width, height);
+    this.animateSizeTransition(width, height);
+    this.sizeTween.tween.set({ width, height }).start();
     this.maxPerRow = config.renderer.maxPerRow;
     this.relayout();
     this.render();
@@ -850,6 +851,19 @@ export class DiceRenderer {
   }
 
   private tick = (now: number) => {
+  if (this.sizeTween.active) {
+    const t = Math.min(1, (now - this.sizeTween.tween.startTime) / this.sizeTween.tween.duration);
+    this.currentSize.width = this.interpolate(this.sizeTween.tween.start.width, this.sizeTween.tween.end.width, t);
+    this.currentSize.height = this.interpolate(this.sizeTween.tween.start.height, this.sizeTween.tween.end.height, t);
+    this.renderer.setSize(this.currentSize.width, this.currentSize.height, false);
+  }
+
+  if (this.sizeTween.active) {
+    const t = Math.min(1, (now - this.sizeTween.tween.startTime) / this.sizeTween.tween.duration);
+    this.currentSize.width = this.interpolate(this.sizeTween.tween.start.width, this.sizeTween.tween.end.width, t);
+    this.currentSize.height = this.interpolate(this.sizeTween.tween.start.height, this.sizeTween.tween.end.height, t);
+    this.renderer.setSize(this.currentSize.width, this.currentSize.height, false);
+  }
     this.stepTweens(now);
     this.applyShake(now);
     const fading = this.stepPlateFade(now);
