@@ -13,6 +13,8 @@ body {
   -webkit-user-select: none;
   user-select: none;
   touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .app {
@@ -25,6 +27,9 @@ body {
 
 .info-panel {
   padding: 12px 16px;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  padding-left: calc(16px + env(safe-area-inset-left, 0px));
+  padding-right: calc(16px + env(safe-area-inset-right, 0px));
   font-size: calc(var(--font-scale) * 14px);
   color: #bbb;
   border-bottom: 1px solid #2a2a2a;
@@ -40,6 +45,8 @@ body {
 
 .status-line {
   padding: 4px 16px;
+  padding-left: calc(16px + env(safe-area-inset-left, 0px));
+  padding-right: calc(16px + env(safe-area-inset-right, 0px));
   padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
   text-align: center;
   font-size: calc(var(--font-scale) * 10px);
@@ -53,7 +60,9 @@ body {
   flex-direction: column;
   gap: 8px;
   padding: 12px 16px;
-  padding-bottom: 12px;
+  padding-left: calc(16px + env(safe-area-inset-left, 0px));
+  padding-right: calc(16px + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid #2a2a2a;
 }
 
@@ -82,20 +91,6 @@ body {
 .action-bar button:disabled {
   opacity: 0.4;
   cursor: default;
-}
-
-.settings-row {
-  justify-content: flex-start;
-  flex-wrap: wrap;
-}
-
-.settings-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: calc(var(--font-scale) * 13px);
-  color: #bbb;
-  cursor: pointer;
 }
 
 @media (orientation: landscape) {
