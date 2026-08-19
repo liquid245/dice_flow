@@ -6,6 +6,7 @@ export type { SoundName };
 
 let ctx: AudioContext | null = null;
 const buffers = new Map<SoundName, AudioBuffer>();
+const activeSources = new Set<AudioBufferSourceNode>();
 let preloadStarted = false;
 let unlocked = false;
 
@@ -51,4 +52,6 @@ export function playSound(name: SoundName): void {
   source.buffer = buffer;
   source.connect(ctx.destination);
   source.start();
+  activeSources.add(source);
+  source.onended = () => activeSources.delete(source);
 }
