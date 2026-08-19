@@ -40,7 +40,7 @@ export const config = {
     cameraPadding: 0.80,
     grabScale: 1.25,
     grabAnimMs: 120,
-    dragFollowMs: 100,
+    dragFollowMs: 40,
     dragLift: 0,
     dragSpacing: 0.55,
     minPerRow: 0,
