@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { usePwaUpdate } from '../../app/usePwaUpdate';
 
 type MemoryInfo = { usedJSHeapSize: number } | undefined;
 
@@ -12,6 +13,7 @@ const DEBUG = import.meta.env.DEV;
 export function StatusLine() {
   const [fps, setFps] = useState(0);
   const [memory, setMemory] = useState<number | null>(null);
+  const { status, progress } = usePwaUpdate();
 
   useEffect(() => {
     if (!DEBUG) return;
@@ -41,7 +43,17 @@ export function StatusLine() {
 
   return (
     <div className="status-line">
-      <span>{__APP_VERSION__}</span>
+      {status === 'idle' && <span>{__APP_VERSION__}</span>}
+      {status === 'downloading' && (
+        <span className="update-status">
+          <span>Downloading update</span>
+          <span className="update-bar">
+            <span className="update-bar-fill" style={{ width: `${progress}%` }} />
+          </span>
+          <span>{progress}%</span>
+        </span>
+      )}
+      {status === 'ready' && <span>Update ready, reload app</span>}
       {DEBUG && <span> · {fps} FPS</span>}
       {DEBUG && memory !== null && <span> · {Math.round(memory / 1024 / 1024)} MB</span>}
     </div>

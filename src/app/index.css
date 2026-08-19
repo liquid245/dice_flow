@@ -54,6 +54,29 @@ body {
   user-select: none;
 }
 
+.update-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.update-bar {
+  display: inline-block;
+  width: 110px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.update-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
 .action-bar {
   display: flex;
   flex-direction: column;
