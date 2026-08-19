@@ -8,8 +8,8 @@ export default function App() {
     <main className="app">
       <InfoPanel />
       <RendererCanvas />
-      <ActionBar />
       <StatusLine />
+      <ActionBar />
     </main>
   );
 }
