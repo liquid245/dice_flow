@@ -8,6 +8,7 @@ import { useGroupSwipe } from '../input/useGroupSwipe';
 import { useBackgroundTap } from '../input/useBackgroundTap';
 import { TapCycleController, visualOrder } from '../input/tapCycle';
 import { selectedDice, selectedIds } from '../core/selection/selection';
+import { config } from '../config';
 import type { HitTest } from '../input/hitTest';
 
 export function RendererCanvas() {
@@ -33,6 +34,15 @@ export function RendererCanvas() {
     if (!renderer) return;
     renderer.sync(state);
   }, [state]);
+
+  useEffect(() => {
+    const duration = config.renderer.shake.durationMs;
+    if (state.selection.kind === 'none' || duration <= 0) return;
+    const timer = window.setTimeout(() => {
+      dispatch({ type: 'select', ids: [], mode: 'set' });
+    }, duration);
+    return () => window.clearTimeout(timer);
+  }, [state.selection, dispatch]);
 
   const selectedCount = selectedDice(state.dice, state.selection).length;
   useEffect(() => {

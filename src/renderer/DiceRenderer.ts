@@ -54,7 +54,6 @@ export class DiceRenderer {
   private idSlot = new Map<DiceId, number>();
   private freeSlots: number[] = [];
   private selected = new Set<DiceId>();
-  private selectionSince: number | null = null;
   private shakeActive = false;
   private groupsByValue = new Map<number, Die[]>();
 
@@ -619,11 +618,7 @@ export class DiceRenderer {
     const changed = prev.size !== next.size || ![...prev].every((id) => next.has(id));
     this.selected = next;
     if (changed) {
-      if (prev.size === 0 && next.size > 0) this.selectionSince = performance.now();
-      else if (next.size === 0) {
-        this.selectionSince = null;
-        this.shakeActive = false;
-      }
+      this.shakeActive = next.size > 0;
     }
     return changed;
   }
@@ -642,19 +637,12 @@ export class DiceRenderer {
   }
 
   private applyShake(now: number): void {
-    const duration = config.renderer.shake.durationMs;
-    const shaking =
-      this.selected.size > 0 &&
-      this.selectionSince != null &&
-      (duration <= 0 || now - this.selectionSince < duration);
-
-    if (shaking || shaking !== this.shakeActive) {
-      this.shakeActive = shaking;
-      for (const id of this.selected) {
-        const slot = this.idSlot.get(id);
-        if (slot == null) continue;
-        this.writeMatrix(slot, now);
-      }
+    if (!this.shakeActive) return;
+    this.ensureLoop();
+    for (const id of this.selected) {
+      const slot = this.idSlot.get(id);
+      if (slot == null) continue;
+      this.writeMatrix(slot, now);
     }
   }
 
