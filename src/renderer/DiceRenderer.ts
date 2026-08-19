@@ -378,6 +378,7 @@ export class DiceRenderer {
     const now = performance.now();
     if (isInitial) {
       this.populateInitial(state);
+      this.prev = this.snapshots(state);
       this.writeAllMatrices(now);
     } else {
       this.applyStateTransitions(state, layoutChanged);
