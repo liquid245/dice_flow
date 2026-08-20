@@ -60,7 +60,6 @@ body {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.5),
     inset 0 -1px 0 rgba(255, 255, 255, 0.18);
-  overflow: hidden;
   touch-action: none;
   -webkit-appearance: none;
   appearance: none;
@@ -68,11 +67,11 @@ body {
 }
 
 .info-collapsed {
-  display: block;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
 }
 
 .info-panel.is-open .info-collapsed {
@@ -80,15 +79,29 @@ body {
 }
 
 .info-expand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
   display: grid;
   grid-template-rows: 0fr;
   transition: grid-template-rows 0.3s ease;
   overflow: hidden;
+  z-index: 20;
 }
 
 .info-expand-inner {
   min-height: 0;
-  overflow: hidden;
+  max-height: 60vh;
+  overflow: hidden auto;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(20, 20, 26, 0.72);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(140%);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .info-panel.is-open .info-expand {
@@ -195,10 +208,10 @@ body {
   background: conic-gradient(
     from var(--glass-angle, -90deg),
     transparent 0deg,
-    rgba(255, 255, 255, var(--glass-glow-opacity, 0.4)) var(--glass-glow-peak, 40deg),
+    rgba(255, 255, 255, calc(var(--glass-glow-opacity, 0.4) + var(--press, 0) * 0.4)) var(--glass-glow-peak, 40deg),
     transparent var(--glass-glow-fade, 120deg),
     transparent calc(var(--glass-opp-peak, 220deg) - 16deg),
-    rgba(255, 255, 255, var(--glass-opp-opacity, 0.4)) var(--glass-opp-peak, 220deg),
+    rgba(255, 255, 255, calc(var(--glass-opp-opacity, 0.4) + var(--press, 0) * 0.4)) var(--glass-opp-peak, 220deg),
     transparent var(--glass-opp-fade, 300deg),
     transparent 360deg
   );
@@ -226,15 +239,18 @@ body {
   pointer-events: none;
 }
 
-/* Нажато */
-.action-bar button:active::before,
-.info-panel:active::before {
+/* Кнопки действий: мгновенный блик при нажатии */
+.action-bar button:active::before {
   opacity: 1;
 }
 
-.action-bar button:active,
-.info-panel:active {
+.action-bar button:active {
   filter: brightness(0.94);
+}
+
+/* История: блик нарастает при удержании и следует за пальцем */
+.info-panel::before {
+  opacity: var(--press, 0);
 }
 
 /* Неактивно */
