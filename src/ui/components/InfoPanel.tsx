@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useGame } from '../../app/game';
 import { changesSinceLastRoll } from '../../core/history/selectors';
 import { selectedDice } from '../../core/selection/selection';
@@ -63,7 +63,8 @@ export function InfoPanel() {
     buttonRef.current?.style.removeProperty('--press');
   };
 
-  const onPointerDown = () => {
+  const onPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
     pressStartRef.current = performance.now();
     clearHoldTimer();
     startPressGlow();
@@ -81,6 +82,13 @@ export function InfoPanel() {
   };
 
   const onPointerCancel = () => {
+    clearHoldTimer();
+    stopPressGlow();
+    setHeld(false);
+  };
+
+  const onPointerLeave = () => {
+    if (holdTimerRef.current === null) return;
     clearHoldTimer();
     stopPressGlow();
     setHeld(false);
@@ -110,6 +118,7 @@ export function InfoPanel() {
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onPointerLeave={onPointerLeave}
       onKeyDown={onKeyDown}
     >
       <span className="info-collapsed">{inline}</span>

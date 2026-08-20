@@ -138,5 +138,6 @@ function selectGroupRange(state: GameState, min: number, max: number): GameState
 }
 
 function clear(state: GameState): GameState {
+  if (state.dice.length === 0) return state;
   return { ...state, dice: [], swipeAddAvailable: true, selection: noneSelection };
 }

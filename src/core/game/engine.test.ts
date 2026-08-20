@@ -28,6 +28,7 @@ describe('engine', () => {
     engine.dispatch({ type: 'select', ids: ['d1'], mode: 'set' });
     engine.dispatch({ type: 'move', targetValue: 5 });
     engine.dispatch({ type: 'select', ids: ['d2'], mode: 'set' });
+    engine.dispatch({ type: 'select', ids: ['d1'], mode: 'add' });
     engine.dispatch({ type: 'roll' });
     engine.dispatch({ type: 'delete' });
     engine.dispatch({ type: 'clear' });
@@ -38,13 +39,32 @@ describe('engine', () => {
     expect(history[1]).toMatchObject({ kind: 'move', count: 1, value: 5 });
   });
 
-  it('records the reroll value when the selected dice are uniform', () => {
+  it('records the reroll value when the rerolled dice are uniform', () => {
     const engine = createEngine(makeDeps());
     engine.dispatch({ type: 'add', count: 3, values: [6, 6, 2] });
     engine.dispatch({ type: 'select', ids: ['d1', 'd2'], mode: 'set' });
     engine.dispatch({ type: 'reroll' });
     const last = engine.getState().history[engine.getState().history.length - 1];
-    expect(last).toMatchObject({ kind: 'reroll', count: 2, value: 6 });
+    expect(last).toMatchObject({ kind: 'reroll', count: 2, value: 1 });
+  });
+
+  it('does not log or record a no-op action', () => {
+    const engine = createEngine(makeDeps());
+    engine.dispatch({ type: 'add', count: 2 });
+    const before = engine.getState().history.length;
+
+    engine.dispatch({ type: 'add', count: 0 });
+    engine.dispatch({ type: 'roll' });
+    expect(engine.getState().dice).toHaveLength(2);
+    expect(engine.getState().history).toHaveLength(before);
+
+    engine.dispatch({ type: 'clear' });
+    expect(engine.getState().history.map((e) => e.kind)).toEqual(['add', 'clear']);
+    const afterClear = engine.getState().history.length;
+
+    engine.dispatch({ type: 'clear' });
+    engine.dispatch({ type: 'delete' });
+    expect(engine.getState().history).toHaveLength(afterClear);
   });
 
   it('undoes and redoes every action, excluding selection', () => {
