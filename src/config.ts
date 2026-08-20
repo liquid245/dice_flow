@@ -63,6 +63,7 @@ export const config = {
       xAmplitude: 0.05,
       xPhaseShift: 1.7,
       durationMs: 30000,
+      decayMs: 400,
     },
     pixelate: {
       enabled: false,

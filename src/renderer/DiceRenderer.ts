@@ -54,7 +54,10 @@ export class DiceRenderer {
   private idSlot = new Map<DiceId, number>();
   private freeSlots: number[] = [];
   private selected = new Set<DiceId>();
-  private shakeActive = false;
+  private shakeIds = new Set<DiceId>();
+  private shakeAmp = 0;
+  private shakeFading = false;
+  private lastShake = 0;
   private groupsByValue = new Map<number, Die[]>();
 
   private plates = new Map<number, THREE.Mesh>();
@@ -372,9 +375,8 @@ export class DiceRenderer {
       this.fitCamera(!isInitial);
     }
 
-    const selectionChanged = this.reconcileSelection(state);
-
     const now = performance.now();
+    const selectionChanged = this.reconcileSelection(state, now);
     if (isInitial) {
       this.populateInitial(state);
       this.prev = this.snapshots(state);
@@ -605,7 +607,7 @@ export class DiceRenderer {
     this.dirty = true;
   }
 
-  private reconcileSelection(state: GameState): boolean {
+  private reconcileSelection(state: GameState, now: number): boolean {
     const prev = this.selected;
     const next = new Set<DiceId>();
     for (const die of state.dice) {
@@ -618,7 +620,15 @@ export class DiceRenderer {
     const changed = prev.size !== next.size || ![...prev].every((id) => next.has(id));
     this.selected = next;
     if (changed) {
-      this.shakeActive = next.size > 0;
+      if (next.size > 0) {
+        this.shakeIds = next;
+        this.shakeAmp = 1;
+        this.shakeFading = false;
+      } else {
+        this.shakeAmp = 1;
+        this.shakeFading = true;
+      }
+      this.lastShake = now;
     }
     return changed;
   }
@@ -637,11 +647,25 @@ export class DiceRenderer {
   }
 
   private applyShake(now: number): void {
-    if (!this.shakeActive) return;
+    if (this.shakeIds.size === 0) return;
+    const shake = config.renderer.shake;
+    if (this.shakeFading) {
+      const dt = (now - this.lastShake) / 1000;
+      if (dt > 0) this.shakeAmp *= Math.exp(-dt / (shake.decayMs / 1000));
+    }
+    this.lastShake = now;
+    if (this.shakeAmp < 0.01) {
+      this.shakeIds.clear();
+      this.shakeAmp = 0;
+      return;
+    }
     this.ensureLoop();
-    for (const id of this.selected) {
+    for (const id of this.shakeIds) {
       const slot = this.idSlot.get(id);
-      if (slot == null) continue;
+      if (slot == null) {
+        this.shakeIds.delete(id);
+        continue;
+      }
       this.writeMatrix(slot, now);
     }
   }
@@ -658,12 +682,13 @@ export class DiceRenderer {
       this.qB.multiplyQuaternions(this.qA, face);
       orientation = this.qB;
     }
-    if (die.selected && this.shakeActive) {
+    if (this.shakeIds.has(die.id) && this.shakeAmp > 0) {
       const t = now / 1000;
       const shake = config.renderer.shake;
       const phase = die.shakePhase;
-      const sx = Math.sin(t * shake.xFrequency + phase * shake.xPhaseShift) * shake.xAmplitude;
-      const sz = Math.sin(t * shake.zFrequency + phase) * shake.zAmplitude;
+      const a = this.shakeAmp;
+      const sx = Math.sin(t * shake.xFrequency + phase * shake.xPhaseShift) * shake.xAmplitude * a;
+      const sz = Math.sin(t * shake.zFrequency + phase) * shake.zAmplitude * a;
       this.eul.set(sx, 0, sz);
       this.qA.setFromEuler(this.eul);
       this.qB.multiplyQuaternions(this.qA, orientation);
@@ -824,7 +849,7 @@ export class DiceRenderer {
     const fading = this.stepPlateFade(now);
     this.render();
 
-    const active = motion || this.shakeActive || fading || camera;
+    const active = motion || this.shakeIds.size > 0 || fading || camera;
     this.rafId = active ? requestAnimationFrame(this.tick) : null;
   };
 
