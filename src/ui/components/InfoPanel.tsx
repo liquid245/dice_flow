@@ -115,11 +115,13 @@ export function InfoPanel() {
       <span className="info-collapsed">{inline}</span>
       <span className="info-expand" aria-hidden={!open}>
         <span className="info-expand-inner">
-          {parts.map((line, index) => (
-            <span className="info-line" key={`${index}-${line}`}>
-              {line}
-            </span>
-          ))}
+          <span className="info-expand-body">
+            {parts.map((line, index) => (
+              <span className="info-line" key={`${index}-${line}`}>
+                {line}
+              </span>
+            ))}
+          </span>
         </span>
       </span>
     </button>
