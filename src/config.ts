@@ -102,7 +102,7 @@ export const config = {
   ui: {
     fontScale: 1,
     panels: {
-      borders: true,
+      borders: false,
     },
     infoPanel: {
       centered: true,
