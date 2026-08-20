@@ -1,6 +1,7 @@
 import { selectedDice } from '../../core/selection/selection';
 import { useGame } from '../../app/game';
 import { config, type ButtonKey } from '../../config';
+import { InstallButton } from './InstallButton';
 
 export function ActionBar() {
   const { state, dispatch, canUndo, canRedo } = useGame();
@@ -58,6 +59,7 @@ export function ActionBar() {
           )
         )}
       </div>
+      <InstallButton />
     </div>
   );
 }
