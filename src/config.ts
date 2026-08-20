@@ -124,6 +124,11 @@ export const config = {
   },
   vibration: {
     enabled: true,
+    session: {
+      enabled: true,
+      burstMs: 20,
+      intervalMs: 40,
+    },
     patterns: {
       roll: [40, 30, 40],
       select: 15,

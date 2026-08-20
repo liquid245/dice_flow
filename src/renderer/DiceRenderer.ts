@@ -11,7 +11,7 @@ import { startMotion, motionValue, motionProgress, motionDone, type Motion } fro
 import type { DieHit } from '../input/hitTest';
 import { config } from '../config';
 import { playSound, type SoundName } from '../services/audio';
-import { vibrate, type VibrationName } from '../services/vibration';
+import { vibrate, vibrateSessionStart, vibrateSessionStop, type VibrationName } from '../services/vibration';
 import { plateOpacity } from './plateOpacity';
 
 interface DieInstance {
@@ -68,6 +68,7 @@ export class DiceRenderer {
   private hasDice = false;
   private synced = false;
   private dirty = false;
+  private hapticActive = false;
 
   private dragId: DiceId | null = null;
   private dragSolo = false;
@@ -138,6 +139,7 @@ export class DiceRenderer {
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
     this.resize();
   }
 
@@ -384,8 +386,9 @@ export class DiceRenderer {
       this.applyStateTransitions(state, layoutChanged);
     }
 
-    if (selectionChanged && !layoutChanged && !isInitial && this.selected.size > 0) {
-      vibrate('select');
+    if (selectionChanged && !layoutChanged && !isInitial) {
+      if (this.selected.size > 0) vibrate('select');
+      this.startHaptics();
     }
 
     if (this.dragId != null && this.idSlot.get(this.dragId) == null) {
@@ -418,6 +421,7 @@ export class DiceRenderer {
     }
     for (const sound of sounds) playSound(sound);
     for (const vibration of vibrations) vibrate(vibration);
+    if (vibrations.size > 0) this.startHaptics();
 
     for (const die of state.dice) {
       if (this.dragOffsets.has(die.id)) continue;
@@ -855,8 +859,28 @@ export class DiceRenderer {
     const fading = this.stepPlateFade(now);
     this.render();
 
+    if (this.hapticActive && !motion && this.shakeIds.size === 0) {
+      this.hapticActive = false;
+      vibrateSessionStop();
+    }
+
     const active = motion || this.shakeIds.size > 0 || fading || camera;
     this.rafId = active ? requestAnimationFrame(this.tick) : null;
+  };
+
+  private stopHaptics(): void {
+    if (!this.hapticActive) return;
+    this.hapticActive = false;
+    vibrateSessionStop();
+  }
+
+  private startHaptics(): void {
+    this.hapticActive = true;
+    vibrateSessionStart();
+  }
+
+  private onVisibilityChange = (): void => {
+    if (document.hidden) this.stopHaptics();
   };
 
   render(): void {
@@ -907,6 +931,8 @@ export class DiceRenderer {
   dispose(): void {
     if (this.rafId !== null) cancelAnimationFrame(this.rafId);
     this.resizeObserver.disconnect();
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    this.stopHaptics();
     for (const mesh of this.instanced) mesh.dispose();
     this.pixelPass?.dispose();
     this.composer?.dispose();

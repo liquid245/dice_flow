@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useGame } from '../app/game';
 import { DiceRenderer } from './DiceRenderer';
@@ -19,7 +19,7 @@ export function RendererCanvas() {
   const rendererRef = useRef<DiceRenderer | null>(null);
   const cycleRef = useRef(new TapCycleController());
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const renderer = new DiceRenderer(container);
@@ -30,7 +30,7 @@ export function RendererCanvas() {
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const renderer = rendererRef.current;
     if (!renderer) return;
     renderer.sync(state);
