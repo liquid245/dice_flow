@@ -1,6 +1,14 @@
 :root {
   color-scheme: dark;
   --font-scale: 1;
+  --glass-gradient: linear-gradient(145deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.06));
+  --glass-border: rgba(255, 255, 255, 0.25);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --glass-radius: 16px;
+  --glass-sheen: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.25) 45%, transparent 60%);
+  --glass-tilt-x: 0.5;
+  --glass-tilt-y: 0.5;
 }
 
 body {
@@ -104,12 +112,14 @@ body {
 }
 
 .action-bar button {
+  position: relative;
   width: 100%;
   min-width: 0;
   padding: 6px clamp(4px, 1vw, 8px);
-  border-radius: 8px;
-  border: 1px solid #3a3a3a;
-  background: #2a2a2a;
+  border-radius: var(--glass-radius);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-gradient);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
   color: #eee;
   font-size: calc(var(--font-scale) * 14px);
   cursor: pointer;
@@ -118,9 +128,32 @@ body {
   text-overflow: ellipsis;
 }
 
+.action-bar button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--glass-sheen);
+  background-size: 220% 220%;
+  background-position:
+    calc(var(--glass-tilt-x, 0.5) * 100%) calc(var(--glass-tilt-y, 0.5) * 100%);
+  pointer-events: none;
+}
+
+.action-bar button:active {
+  filter: brightness(0.94);
+}
+
 .action-bar button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-bar button::before {
+    background: var(--glass-sheen);
+    background-position: center;
+  }
 }
 
 .action-row--install {
