@@ -44,7 +44,10 @@ body {
 }
 
 .status-line {
-  padding: 4px 16px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
   padding-left: calc(16px + env(safe-area-inset-left, 0px));
   padding-right: calc(16px + env(safe-area-inset-right, 0px));
   text-align: center;

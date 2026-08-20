@@ -8,6 +8,7 @@ import { useGroupSwipe } from '../input/useGroupSwipe';
 import { useBackgroundTap } from '../input/useBackgroundTap';
 import { TapCycleController, visualOrder } from '../input/tapCycle';
 import { selectedDice, selectedIds } from '../core/selection/selection';
+import { StatusLine } from '../ui/components/StatusLine';
 import { config } from '../config';
 import type { HitTest } from '../input/hitTest';
 
@@ -91,6 +92,8 @@ export function RendererCanvas() {
   };
 
   return (
-    <div ref={containerRef} className="table" {...pointerHandlers} />
+    <div ref={containerRef} className="table" {...pointerHandlers}>
+      <StatusLine />
+    </div>
   );
 }
