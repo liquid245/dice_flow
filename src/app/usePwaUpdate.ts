@@ -31,12 +31,13 @@ export function usePwaUpdate() {
       if (t < 1) animationFrame = requestAnimationFrame(tick);
     };
 
-    const finishDownload = () => {
+    const finishDownload = (worker: ServiceWorker | null) => {
       if (!downloadingRef.current) return;
       stopAnimation();
       downloadingRef.current = false;
       setProgress(100);
       setStatus('ready');
+      if (worker) worker.postMessage({ type: 'SKIP_WAITING' });
     };
 
     const onUpdateFound = (reg: ServiceWorkerRegistration) => {
@@ -49,7 +50,7 @@ export function usePwaUpdate() {
       startTime = performance.now();
       animationFrame = requestAnimationFrame(tick);
       newWorker.addEventListener('statechange', () => {
-        if (newWorker.state === 'installed') finishDownload();
+        if (newWorker.state === 'installed') finishDownload(newWorker);
       });
     };
 

@@ -53,7 +53,7 @@ export function StatusLine() {
           <span>{progress}%</span>
         </span>
       )}
-      {status === 'ready' && <span>Update ready, reload app</span>}
+      {status === 'ready' && <span>New version is ready, reload the page.</span>}
       {DEBUG && <span> · {fps} FPS</span>}
       {DEBUG && memory !== null && <span> · {Math.round(memory / 1024 / 1024)} MB</span>}
     </div>
