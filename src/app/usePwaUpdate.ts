@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { config } from '../config';
 
 export type UpdateStatus = 'idle' | 'downloading' | 'ready';
 
 const SW_PATH = `${import.meta.env.BASE_URL}sw.js`;
-const CHECK_INTERVAL_MS = 600_000;
 const DOWNLOAD_MS = 2500;
 const MAX_ESTIMATE = 95;
 
@@ -80,7 +80,7 @@ export function usePwaUpdate() {
     const onlineHandler = () => void check();
     document.addEventListener('visibilitychange', visibilityHandler);
     window.addEventListener('online', onlineHandler);
-    const interval = window.setInterval(() => void check(), CHECK_INTERVAL_MS);
+    const interval = window.setInterval(() => void check(), config.pwa.updateCheckIntervalMs);
 
     return () => {
       disposed = true;

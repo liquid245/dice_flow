@@ -85,6 +85,9 @@ export const config = {
   storage: {
     saveDebounceMs: 500,
   },
+  pwa: {
+    updateCheckIntervalMs: 10_000,
+  },
   assets: {
     sounds: {
       appear: `${base}sounds/850097__lbrady240__pop11.wav`,
