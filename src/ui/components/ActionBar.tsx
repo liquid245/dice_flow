@@ -10,7 +10,7 @@ export function ActionBar() {
   const isOn = (key: ButtonKey) => config.buttonVisibility[key];
 
   return (
-    <div className="action-bar">
+    <div className="action-bar" style={{ borderTop: config.ui.panels.borders ? undefined : 'none' }}>
       <div className="action-row">
         {isOn('delete') && (
           <button disabled={!hasDice} onClick={() => dispatch({ type: 'delete' })}>

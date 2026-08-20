@@ -18,9 +18,10 @@ body {
 }
 
 .app {
-  min-height: 100vh;
-  min-height: 100svh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100svh;
+  height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -33,6 +34,7 @@ body {
   font-size: calc(var(--font-scale) * 14px);
   color: #bbb;
   border-bottom: 1px solid #2a2a2a;
+  overflow: hidden;
 }
 
 .table {
@@ -89,6 +91,7 @@ body {
   padding-right: calc(16px + env(safe-area-inset-right, 0px));
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid #2a2a2a;
+  overflow: hidden;
 }
 
 .action-row {

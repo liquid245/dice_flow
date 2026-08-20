@@ -18,8 +18,13 @@ export function InfoPanel() {
   const changes = changesSinceLastRoll(state.history);
   const infoPanel = config.ui.infoPanel;
 
+  const borders = config.ui.panels.borders;
+
   return (
-    <div className="info-panel" style={{ textAlign: infoPanel.centered ? 'center' : 'left' }}>
+    <div
+      className="info-panel"
+      style={{ textAlign: infoPanel.centered ? 'center' : 'left', borderBottom: borders ? undefined : 'none' }}
+    >
       {state.dice.length === 0 ? (
         <span>{infoPanel.swipeHint}</span>
       ) : (

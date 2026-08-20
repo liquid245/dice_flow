@@ -98,6 +98,9 @@ export const config = {
   buttonVisibility,
   ui: {
     fontScale: 1,
+    panels: {
+      borders: true,
+    },
     infoPanel: {
       centered: true,
       swipeHint: 'Swipe Finger to Add or Reduce Dices',
