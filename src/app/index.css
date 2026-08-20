@@ -140,6 +140,21 @@ body {
   pointer-events: none;
 }
 
+.action-bar button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at var(--glass-mx, 50%) var(--glass-my, 50%), rgba(255, 255, 255, 0.35), transparent 45%);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.action-bar button:hover::after {
+  opacity: 1;
+}
+
 .action-bar button:active {
   filter: brightness(0.94);
 }
@@ -252,6 +267,11 @@ body {
   .action-bar button::before {
     background: var(--glass-sheen);
     background-position: center;
+  }
+
+  .action-bar button::after {
+    opacity: 0;
+    transition: none;
   }
 
   .action-bar button.glass-e::before {

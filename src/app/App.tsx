@@ -1,10 +1,10 @@
 import { InfoPanel } from '../ui/components/InfoPanel';
 import { RendererCanvas } from '../renderer/RendererCanvas';
 import { ActionBar } from '../ui/components/ActionBar';
-import { useDeviceTilt } from '../ui/useDeviceTilt';
+import { useGlassLight } from '../ui/useGlassLight';
 
 export default function App() {
-  useDeviceTilt();
+  useGlassLight();
 
   return (
     <main className="app">
