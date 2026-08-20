@@ -22,6 +22,7 @@ interface DieInstance {
   scale: number;
   selected: boolean;
   shakePhase: number;
+  shakeAmp: number;
   dying: boolean;
   spin: number;
   tx: number;
@@ -55,8 +56,6 @@ export class DiceRenderer {
   private freeSlots: number[] = [];
   private selected = new Set<DiceId>();
   private shakeIds = new Set<DiceId>();
-  private shakeAmp = 0;
-  private shakeFading = false;
   private lastShake = 0;
   private groupsByValue = new Map<number, Die[]>();
 
@@ -492,6 +491,7 @@ export class DiceRenderer {
       scale: 1,
       selected: false,
       shakePhase: Math.random() * Math.PI * 2,
+      shakeAmp: 0,
       dying: false,
       spin: 0,
       tx: x,
@@ -541,6 +541,7 @@ export class DiceRenderer {
     die.scale = 0;
     die.dying = false;
     die.selected = false;
+    die.shakeAmp = 0;
     this.idSlot.delete(die.id);
     this.freeSlots.push(slot);
     this.writeMatrix(slot, performance.now());
@@ -620,13 +621,17 @@ export class DiceRenderer {
     const changed = prev.size !== next.size || ![...prev].every((id) => next.has(id));
     this.selected = next;
     if (changed) {
-      if (next.size > 0) {
-        this.shakeIds = next;
-        this.shakeAmp = 1;
-        this.shakeFading = false;
-      } else {
-        this.shakeAmp = 1;
-        this.shakeFading = true;
+      for (const id of next) {
+        this.shakeIds.add(id);
+        const slot = this.idSlot.get(id);
+        if (slot != null) this.slots[slot].shakeAmp = 1;
+      }
+      for (const id of prev) {
+        if (!next.has(id)) {
+          this.shakeIds.add(id);
+          const slot = this.idSlot.get(id);
+          if (slot != null) this.slots[slot].shakeAmp = 1;
+        }
       }
       this.lastShake = now;
     }
@@ -649,16 +654,6 @@ export class DiceRenderer {
   private applyShake(now: number): void {
     if (this.shakeIds.size === 0) return;
     const shake = config.renderer.shake;
-    if (this.shakeFading) {
-      const dt = (now - this.lastShake) / 1000;
-      if (dt > 0) this.shakeAmp *= Math.exp(-dt / (shake.decayMs / 1000));
-    }
-    this.lastShake = now;
-    if (this.shakeAmp < 0.01) {
-      this.shakeIds.clear();
-      this.shakeAmp = 0;
-      return;
-    }
     this.ensureLoop();
     for (const id of this.shakeIds) {
       const slot = this.idSlot.get(id);
@@ -666,8 +661,19 @@ export class DiceRenderer {
         this.shakeIds.delete(id);
         continue;
       }
+      const die = this.slots[slot];
+      if (!this.selected.has(id)) {
+        const dt = (now - this.lastShake) / 1000;
+        if (dt > 0) die.shakeAmp *= Math.exp(-dt / (shake.decayMs / 1000));
+        if (die.shakeAmp < 0.01) {
+          this.shakeIds.delete(id);
+          die.shakeAmp = 0;
+          continue;
+        }
+      }
       this.writeMatrix(slot, now);
     }
+    this.lastShake = now;
   }
 
   private writeMatrix(slot: number, now: number, spinX = 0, spinY = 0): void {
@@ -682,11 +688,11 @@ export class DiceRenderer {
       this.qB.multiplyQuaternions(this.qA, face);
       orientation = this.qB;
     }
-    if (this.shakeIds.has(die.id) && this.shakeAmp > 0) {
+    if (this.shakeIds.has(die.id) && die.shakeAmp > 0) {
       const t = now / 1000;
       const shake = config.renderer.shake;
       const phase = die.shakePhase;
-      const a = this.shakeAmp;
+      const a = die.shakeAmp;
       const sx = Math.sin(t * shake.xFrequency + phase * shake.xPhaseShift) * shake.xAmplitude * a;
       const sz = Math.sin(t * shake.zFrequency + phase) * shake.zAmplitude * a;
       this.eul.set(sx, 0, sz);
