@@ -122,33 +122,29 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 
-  /* Базовый блик по периметру: симметричный, расслабленный, точечный */
-  --glass-glow-opacity: 0.5;
-  --glass-glow-start: 8deg;
-  --glass-glow-end: 32deg;
-  --glass-glow-fade: 40deg;
-  --glass-opp-opacity: 0.5;
-  --glass-opp-start: 188deg;
-  --glass-opp-end: 212deg;
-  --glass-opp-fade: 220deg;
+  /* Базовый блик по периметру: тонкий, без утолщения, симметричный и расслабленный */
+  --glass-glow-opacity: 0.35;
+  --glass-glow-peak: 16deg;
+  --glass-glow-fade: 36deg;
+  --glass-opp-opacity: 0.35;
+  --glass-opp-peak: 196deg;
+  --glass-opp-fade: 216deg;
 }
 
 .action-bar button::after {
   content: '';
   position: absolute;
   inset: 0;
-  padding: 2px;
+  padding: 1.5px;
   border-radius: inherit;
   background: conic-gradient(
     from var(--glass-angle, -90deg),
     transparent 0deg,
-    rgba(255, 255, 255, var(--glass-glow-opacity, 0.5)) var(--glass-glow-start, 8deg),
-    rgba(255, 255, 255, var(--glass-glow-opacity, 0.5)) var(--glass-glow-end, 32deg),
-    transparent var(--glass-glow-fade, 40deg),
-    transparent calc(var(--glass-opp-start, 188deg) - 4deg),
-    rgba(255, 255, 255, var(--glass-opp-opacity, 0.5)) var(--glass-opp-start, 188deg),
-    rgba(255, 255, 255, var(--glass-opp-opacity, 0.5)) var(--glass-opp-end, 212deg),
-    transparent var(--glass-opp-fade, 220deg),
+    rgba(255, 255, 255, var(--glass-glow-opacity, 0.35)) var(--glass-glow-peak, 16deg),
+    transparent var(--glass-glow-fade, 36deg),
+    transparent calc(var(--glass-opp-peak, 196deg) - 16deg),
+    rgba(255, 255, 255, var(--glass-opp-opacity, 0.35)) var(--glass-opp-peak, 196deg),
+    transparent var(--glass-opp-fade, 216deg),
     transparent 360deg
   );
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -172,26 +168,22 @@ body {
 
 /* a — Delete: яркая точечная вспышка + едва заметный близнец */
 .action-bar button.glass-a {
-  --glass-glow-opacity: 0.85;
-  --glass-glow-start: 12deg;
-  --glass-glow-end: 26deg;
+  --glass-glow-opacity: 0.55;
+  --glass-glow-peak: 16deg;
   --glass-glow-fade: 34deg;
-  --glass-opp-opacity: 0.15;
-  --glass-opp-start: 192deg;
-  --glass-opp-end: 206deg;
+  --glass-opp-opacity: 0.12;
+  --glass-opp-peak: 196deg;
   --glass-opp-fade: 214deg;
 }
 
 /* b — Add: широкие мягкие симметричные пятна, спокойные */
 .action-bar button.glass-b {
-  --glass-glow-opacity: 0.35;
-  --glass-glow-start: 0deg;
-  --glass-glow-end: 56deg;
-  --glass-glow-fade: 72deg;
-  --glass-opp-opacity: 0.35;
-  --glass-opp-start: 180deg;
-  --glass-opp-end: 236deg;
-  --glass-opp-fade: 252deg;
+  --glass-glow-opacity: 0.25;
+  --glass-glow-peak: 24deg;
+  --glass-glow-fade: 52deg;
+  --glass-opp-opacity: 0.25;
+  --glass-opp-peak: 204deg;
+  --glass-opp-fade: 232deg;
 }
 
 /* c — ReRoll: базовый вариант (симметричный расслабленный точечный) */
@@ -200,49 +192,41 @@ body {
 
 /* d — Undo: яркий симметричный узкий */
 .action-bar button.glass-d {
-  --glass-glow-opacity: 0.7;
-  --glass-glow-start: 10deg;
-  --glass-glow-end: 26deg;
-  --glass-glow-fade: 34deg;
-  --glass-opp-opacity: 0.7;
-  --glass-opp-start: 190deg;
-  --glass-opp-end: 206deg;
-  --glass-opp-fade: 214deg;
+  --glass-glow-opacity: 0.5;
+  --glass-glow-peak: 14deg;
+  --glass-glow-fade: 30deg;
+  --glass-opp-opacity: 0.5;
+  --glass-opp-peak: 194deg;
+  --glass-opp-fade: 210deg;
 }
 
 /* e — Redo: сильный передний блик с хвостом + слабый близнец */
 .action-bar button.glass-e {
-  --glass-glow-opacity: 0.75;
-  --glass-glow-start: 0deg;
-  --glass-glow-end: 40deg;
-  --glass-glow-fade: 60deg;
-  --glass-opp-opacity: 0.2;
-  --glass-opp-start: 190deg;
-  --glass-opp-end: 200deg;
-  --glass-opp-fade: 210deg;
+  --glass-glow-opacity: 0.55;
+  --glass-glow-peak: 22deg;
+  --glass-glow-fade: 48deg;
+  --glass-opp-opacity: 0.15;
+  --glass-opp-peak: 202deg;
+  --glass-opp-fade: 222deg;
 }
 
 /* f — Roll/Clear: две узкие искорки, умеренная + слабая */
 .action-bar button.glass-f {
-  --glass-glow-opacity: 0.6;
-  --glass-glow-start: 14deg;
-  --glass-glow-end: 24deg;
-  --glass-glow-fade: 32deg;
-  --glass-opp-opacity: 0.25;
-  --glass-opp-start: 194deg;
-  --glass-opp-end: 204deg;
-  --glass-opp-fade: 212deg;
+  --glass-glow-opacity: 0.4;
+  --glass-glow-peak: 15deg;
+  --glass-glow-fade: 30deg;
+  --glass-opp-opacity: 0.15;
+  --glass-opp-peak: 195deg;
+  --glass-opp-fade: 210deg;
 }
 
 /* g — Install: минимальный, очень спокойный симметричный */
 .action-bar button.glass-g {
-  --glass-glow-opacity: 0.3;
-  --glass-glow-start: 6deg;
-  --glass-glow-end: 30deg;
+  --glass-glow-opacity: 0.22;
+  --glass-glow-peak: 18deg;
   --glass-glow-fade: 38deg;
-  --glass-opp-opacity: 0.3;
-  --glass-opp-start: 186deg;
-  --glass-opp-end: 210deg;
+  --glass-opp-opacity: 0.22;
+  --glass-opp-peak: 198deg;
   --glass-opp-fade: 218deg;
 }
 
