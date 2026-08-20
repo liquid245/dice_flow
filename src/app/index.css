@@ -6,9 +6,7 @@
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.3);
   --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --glass-radius: 16px;
-  --glass-sheen: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.25) 45%, transparent 60%);
-  --glass-tilt-x: 0.5;
-  --glass-tilt-y: 0.5;
+  --glass-angle: -90deg;
 }
 
 body {
@@ -128,31 +126,27 @@ body {
   text-overflow: ellipsis;
 }
 
-.action-bar button::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--glass-sheen);
-  background-size: 220% 220%;
-  background-position:
-    calc(var(--glass-tilt-x, 0.5) * 100%) calc(var(--glass-tilt-y, 0.5) * 100%);
-  pointer-events: none;
-}
-
 .action-bar button::after {
   content: '';
   position: absolute;
   inset: 0;
+  padding: 2px;
   border-radius: inherit;
-  background: radial-gradient(circle at var(--glass-mx, 50%) var(--glass-my, 50%), rgba(255, 255, 255, 0.35), transparent 45%);
-  opacity: 0;
-  transition: opacity 0.15s ease;
+  background: conic-gradient(
+    from var(--glass-angle, -90deg),
+    transparent 0deg,
+    rgba(255, 255, 255, 0.85) 32deg,
+    transparent 64deg,
+    transparent 148deg,
+    rgba(255, 255, 255, 0.35) 180deg,
+    transparent 212deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
   pointer-events: none;
-}
-
-.action-bar button:hover::after {
-  opacity: 1;
 }
 
 .action-bar button:active {
@@ -197,10 +191,6 @@ body {
     inset 0 -1px 0 rgba(255, 255, 255, 0.18);
 }
 
-.action-bar button.glass-c::before {
-  opacity: 0.55;
-}
-
 /* D — Lens / Beveled Puck: выпуклая линза */
 .action-bar button.glass-d {
   border-radius: 12px;
@@ -232,8 +222,11 @@ body {
 }
 
 .action-bar button.glass-e::before {
+  content: '';
+  position: absolute;
   inset: 0;
   padding: 1.5px;
+  border-radius: inherit;
   background: conic-gradient(from var(--glass-conic-angle), transparent 0 60%, rgba(255, 255, 255, 0.95) 82%, transparent 100%);
   background-size: 100% 100%;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -264,16 +257,6 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .action-bar button::before {
-    background: var(--glass-sheen);
-    background-position: center;
-  }
-
-  .action-bar button::after {
-    opacity: 0;
-    transition: none;
-  }
-
   .action-bar button.glass-e::before {
     animation: none;
   }
