@@ -31,22 +31,22 @@ describe('layout', () => {
 
   it('squares a single group', () => {
     const { positions } = layout(diceOf(9, 6), 20, 1);
-    expect(rowCounts(positions)).toEqual([3, 3, 3]);
+    expect(rowCounts(positions)).toEqual([5, 4]);
   });
 
   it('uses more columns in landscape', () => {
     const { positions } = layout(diceOf(9, 6), 20, 2);
-    expect(rowCounts(positions)).toEqual([5, 4]);
+    expect(rowCounts(positions)).toEqual([9]);
   });
 
   it('uses fewer columns in portrait', () => {
     const { positions } = layout(diceOf(9, 6), 20, 0.5);
-    expect(rowCounts(positions)).toEqual([2, 2, 2, 2, 1]);
+    expect(rowCounts(positions)).toEqual([3, 3, 3]);
   });
 
-  it('stacks a small group vertically in portrait', () => {
+  it('spreads a small group horizontally when empty plates take height', () => {
     const { positions } = layout(diceOf(3, 6), 20, 0.5);
-    expect(yLevels(positions)).toBe(3);
+    expect(yLevels(positions)).toBe(1);
   });
 
   it('gives a large group more columns than a small group', () => {
@@ -54,7 +54,7 @@ describe('layout', () => {
     const { positions } = layout(dice, 20, 1);
     const sixes = new Set([...positions.values()].filter((_, i) => i < 12).map((p) => Math.round(p.y * 100)));
     const fives = new Set([...positions.values()].filter((_, i) => i >= 12).map((p) => Math.round(p.y * 100)));
-    expect(sixes.size).toBe(3);
+    expect(sixes.size).toBe(2);
     expect(fives.size).toBe(1);
   });
 
@@ -70,7 +70,7 @@ describe('layout', () => {
 
   it('treats maxPerRow 0 as no cap', () => {
     const { positions } = layout(diceOf(9, 6), 0, 1);
-    expect(rowCounts(positions)).toEqual([3, 3, 3]);
+    expect(rowCounts(positions)).toEqual([5, 4]);
   });
 
   it('respects a low maxPerRow cap', () => {

@@ -106,7 +106,8 @@ function chooseColumns(counts: number[], options: (ColumnOption[] | null)[], asp
       }
       if (!feasible) continue;
 
-      height += (groups.length - 1) * GROUP_GAP;
+      const emptyCount = counts.length - groups.length;
+      height += counts.length * GROUP_GAP + emptyCount * DIE_SIZE;
       const objective = Math.max(
         width + CAMERA_PADDING * 2,
         (height + CAMERA_PADDING * 2) * aspect,
