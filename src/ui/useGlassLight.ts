@@ -3,13 +3,15 @@ import { useEffect } from 'react';
 const hasFinePointer = () => window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+let pointerActive = false;
+
 function setGlobalAngle(angle: number): void {
   document.documentElement.style.setProperty('--glass-angle', `${angle.toFixed(1)}deg`);
 }
 
-function useMouseLight(): void {
+function usePointerLight(): void {
   useEffect(() => {
-    if (!hasFinePointer() || prefersReducedMotion()) return;
+    if (prefersReducedMotion()) return;
 
     let rafId = 0;
     let pendingAngle: number | null = null;
@@ -25,6 +27,14 @@ function useMouseLight(): void {
       setGlobalAngle(angle);
     };
 
+    const onDown = () => {
+      pointerActive = true;
+    };
+
+    const onUp = () => {
+      pointerActive = false;
+    };
+
     const onMove = (event: PointerEvent) => {
       const dx = event.clientX - window.innerWidth / 2;
       const dy = event.clientY - window.innerHeight / 2;
@@ -33,8 +43,16 @@ function useMouseLight(): void {
     };
 
     window.addEventListener('pointermove', onMove, { passive: true });
+    window.addEventListener('pointerdown', onDown, { passive: true });
+    window.addEventListener('pointerup', onUp, { passive: true });
+    window.addEventListener('pointercancel', onUp, { passive: true });
+    window.addEventListener('blur', onUp);
     return () => {
       window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('blur', onUp);
       if (rafId) cancelAnimationFrame(rafId);
     };
   }, []);
@@ -51,7 +69,6 @@ function useGyroLight(): void {
     let lastAngle: number | null = null;
     let granted = false;
     let listening = false;
-    let disposed = false;
 
     const apply = () => {
       rafId = 0;
@@ -64,6 +81,7 @@ function useGyroLight(): void {
     };
 
     const schedule = (event: DeviceOrientationEvent) => {
+      if (pointerActive) return;
       if (event.beta === null || event.gamma === null) return;
       pendingAngle = (Math.atan2(event.beta, event.gamma) * 180) / Math.PI;
       if (!rafId) rafId = requestAnimationFrame(apply);
@@ -100,22 +118,7 @@ function useGyroLight(): void {
       if (event.beta === null || event.gamma === null) return;
       window.removeEventListener('deviceorientation', onProbe);
       window.removeEventListener('deviceorientationabsolute', onProbe);
-      document.removeEventListener('click', onFirstTap);
       enable();
-    };
-
-    const onFirstTap = () => {
-      document.removeEventListener('click', onFirstTap);
-      if (typeof orientation.requestPermission === 'function') {
-        orientation
-          .requestPermission()
-          .then((state) => {
-            if (state === 'granted' && !disposed) enable();
-          })
-          .catch(() => {});
-      } else {
-        enable();
-      }
     };
 
     const onVisibility = () => {
@@ -133,7 +136,6 @@ function useGyroLight(): void {
     if (needsPermission) {
       window.addEventListener('deviceorientation', onProbe);
       window.addEventListener('deviceorientationabsolute', onProbe);
-      document.addEventListener('click', onFirstTap);
     } else {
       enable();
     }
@@ -142,10 +144,8 @@ function useGyroLight(): void {
     reduced.addEventListener('change', onReducedChange);
 
     return () => {
-      disposed = true;
       window.removeEventListener('deviceorientation', onProbe);
       window.removeEventListener('deviceorientationabsolute', onProbe);
-      document.removeEventListener('click', onFirstTap);
       document.removeEventListener('visibilitychange', onVisibility);
       reduced.removeEventListener('change', onReducedChange);
       stop();
@@ -154,6 +154,6 @@ function useGyroLight(): void {
 }
 
 export function useGlassLight() {
-  useMouseLight();
+  usePointerLight();
   useGyroLight();
 }
