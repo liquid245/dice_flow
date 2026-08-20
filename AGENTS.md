@@ -236,7 +236,7 @@ For every task:
 6. Run validation.
 7. Inspect the diff.
 8. Report what changed and what was verified.
-9. Bump the `version` in `package.json` (patch/minor) and commit + push.
+9. Bump the patch `version` and commit + push.
 
 Every final report must end with the version/build number and what was
 pushed. Format:
@@ -246,10 +246,23 @@ pushed. Format:
 Do not rewrite large parts of the project when a smaller change is sufficient.
 
 At the current stage every change is for testing: after implementing and
-validating a change, bump `package.json` `version`, commit and push.
+validating a change, bump the version, commit and push.
 GitHub Actions deploys to GitHub Pages automatically on push to `main`.
 The build injects a timestamp, but the semantic version is read from
 `package.json`.
+
+## Versioning
+
+The version is `x.y.z`.
+
+- The agent bumps only `z` (patch) after each implemented and validated
+  change.
+- The agent never bumps `x` (major) or `y` (minor) on its own. `x` and `y`
+  change only on explicit instruction from the human developer.
+- Bump the `version` in both `package.json` and the root entry of
+  `package-lock.json`; keep the two files in sync.
+- When a change is documentation-only or otherwise does not ship product
+  code, ask the human whether the version should be bumped.
 
 ## Git
 
