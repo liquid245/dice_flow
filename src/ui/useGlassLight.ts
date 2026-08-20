@@ -91,11 +91,21 @@ function useGyroLight(): void {
       start();
     };
 
+    const orientation = DeviceOrientationEvent as unknown as {
+      requestPermission?: () => Promise<'granted' | 'denied'>;
+    };
+    const needsPermission = typeof orientation.requestPermission === 'function';
+
+    const onProbe = (event: DeviceOrientationEvent) => {
+      if (event.beta === null || event.gamma === null) return;
+      window.removeEventListener('deviceorientation', onProbe);
+      window.removeEventListener('deviceorientationabsolute', onProbe);
+      document.removeEventListener('click', onFirstTap);
+      enable();
+    };
+
     const onFirstTap = () => {
       document.removeEventListener('click', onFirstTap);
-      const orientation = DeviceOrientationEvent as unknown as {
-        requestPermission?: () => Promise<'granted' | 'denied'>;
-      };
       if (typeof orientation.requestPermission === 'function') {
         orientation
           .requestPermission()
@@ -120,13 +130,21 @@ function useGyroLight(): void {
       if (prefersReducedMotion()) stop();
     };
 
-    document.addEventListener('click', onFirstTap);
+    if (needsPermission) {
+      window.addEventListener('deviceorientation', onProbe);
+      window.addEventListener('deviceorientationabsolute', onProbe);
+      document.addEventListener('click', onFirstTap);
+    } else {
+      enable();
+    }
     document.addEventListener('visibilitychange', onVisibility);
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     reduced.addEventListener('change', onReducedChange);
 
     return () => {
       disposed = true;
+      window.removeEventListener('deviceorientation', onProbe);
+      window.removeEventListener('deviceorientationabsolute', onProbe);
       document.removeEventListener('click', onFirstTap);
       document.removeEventListener('visibilitychange', onVisibility);
       reduced.removeEventListener('change', onReducedChange);
