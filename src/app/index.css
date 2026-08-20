@@ -104,7 +104,7 @@ body {
 .action-bar button {
   width: 100%;
   min-width: 0;
-  padding: clamp(6px, 1.5vw, 10px) clamp(4px, 1vw, 8px);
+  padding: 6px clamp(4px, 1vw, 8px);
   border-radius: 8px;
   border: 1px solid #3a3a3a;
   background: #2a2a2a;
@@ -119,6 +119,10 @@ body {
 .action-bar button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+.action-row--install {
+  grid-template-columns: 1fr;
 }
 
 @media (orientation: landscape) {
