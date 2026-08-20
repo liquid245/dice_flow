@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { selectedDice } from '../../core/selection/selection';
 import { useGame } from '../../app/game';
 import { config, type ButtonKey } from '../../config';
@@ -10,44 +11,57 @@ export function ActionBar() {
 
   const isOn = (key: ButtonKey) => config.buttonVisibility[key];
 
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = (event.target as Element | null)?.closest?.('button');
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
+      const x = rect.width > 0 ? ((event.clientX - rect.left) / rect.width) * 100 : 50;
+      const y = rect.height > 0 ? ((event.clientY - rect.top) / rect.height) * 100 : 50;
+      (target as HTMLElement).style.setProperty('--press-x', `${x.toFixed(1)}%`);
+      (target as HTMLElement).style.setProperty('--press-y', `${y.toFixed(1)}%`);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, []);
+
   return (
     <div className="action-bar" style={{ borderTop: config.ui.panels.borders ? undefined : 'none' }}>
       <div className="action-row">
         {isOn('delete') && (
-          <button className="glass-a" disabled={!hasDice} onClick={() => dispatch({ type: 'delete' })}>
+          <button disabled={!hasDice} onClick={() => dispatch({ type: 'delete' })}>
             {selectedCount > 0 ? `${config.buttons.delete} ${selectedCount}` : config.buttons.delete}
           </button>
         )}
         {isOn('add') && (
-          <button className="glass-b" onClick={() => dispatch({ type: 'add', count: selectedCount || 1 })}>
+          <button onClick={() => dispatch({ type: 'add', count: selectedCount || 1 })}>
             {config.buttons.add} {selectedCount || 1}
           </button>
         )}
         {isOn('reroll') && (
-          <button className="glass-c" disabled={!hasDice} onClick={() => dispatch({ type: 'reroll' })}>
+          <button disabled={!hasDice} onClick={() => dispatch({ type: 'reroll' })}>
             {config.buttons.reroll}
           </button>
         )}
       </div>
       <div className="action-row">
         {isOn('undo') && (
-          <button className="glass-d" disabled={!canUndo()} onClick={() => dispatch({ type: 'undo' })}>
+          <button disabled={!canUndo()} onClick={() => dispatch({ type: 'undo' })}>
             {config.buttons.undo}
           </button>
         )}
         {isOn('redo') && (
-          <button className="glass-e" disabled={!canRedo()} onClick={() => dispatch({ type: 'redo' })}>
+          <button disabled={!canRedo()} onClick={() => dispatch({ type: 'redo' })}>
             {config.buttons.redo}
           </button>
         )}
         {selectedCount > 0 ? (
           isOn('roll') && (
-            <button className="glass-f" onClick={() => dispatch({ type: 'roll' })}>{config.buttons.roll}</button>
+            <button onClick={() => dispatch({ type: 'roll' })}>{config.buttons.roll}</button>
           )
         ) : (
           isOn('clear') && (
             <button
-              className="glass-f"
               disabled={!hasDice}
               onClick={() => {
                 if (window.confirm('Clear the table?')) {

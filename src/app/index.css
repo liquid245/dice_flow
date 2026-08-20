@@ -154,80 +154,35 @@ body {
   pointer-events: none;
 }
 
+/* Внутренний блик при нажатии: расходится от точки нажатия */
+.action-bar button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at var(--press-x, 50%) var(--press-y, 50%),
+    rgba(255, 255, 255, 0.28),
+    rgba(255, 255, 255, 0.08) 45%,
+    transparent 75%
+  );
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Нажато */
+.action-bar button:active::before {
+  opacity: 1;
+}
+
 .action-bar button:active {
   filter: brightness(0.94);
 }
 
+/* Неактивно */
 .action-bar button:disabled {
   opacity: 0.4;
   cursor: default;
-}
-
-/* Варианты блика по периметру — у каждой кнопки свои параметры.
-   Выбери понравившийся и примени его как базовый (glass-c). */
-
-/* a — Delete: яркая точечная вспышка + едва заметный близнец */
-.action-bar button.glass-a {
-  --glass-glow-opacity: 0.55;
-  --glass-glow-peak: 16deg;
-  --glass-glow-fade: 34deg;
-  --glass-opp-opacity: 0.12;
-  --glass-opp-peak: 196deg;
-  --glass-opp-fade: 214deg;
-}
-
-/* b — Add: широкие мягкие симметричные пятна, спокойные */
-.action-bar button.glass-b {
-  --glass-glow-opacity: 0.25;
-  --glass-glow-peak: 24deg;
-  --glass-glow-fade: 52deg;
-  --glass-opp-opacity: 0.25;
-  --glass-opp-peak: 204deg;
-  --glass-opp-fade: 232deg;
-}
-
-/* c — ReRoll: базовый вариант (симметричный расслабленный точечный) */
-.action-bar button.glass-c {
-}
-
-/* d — Undo: яркий симметричный узкий */
-.action-bar button.glass-d {
-  --glass-glow-opacity: 0.5;
-  --glass-glow-peak: 14deg;
-  --glass-glow-fade: 30deg;
-  --glass-opp-opacity: 0.5;
-  --glass-opp-peak: 194deg;
-  --glass-opp-fade: 210deg;
-}
-
-/* e — Redo: сильный передний блик с хвостом + слабый близнец */
-.action-bar button.glass-e {
-  --glass-glow-opacity: 0.55;
-  --glass-glow-peak: 22deg;
-  --glass-glow-fade: 48deg;
-  --glass-opp-opacity: 0.15;
-  --glass-opp-peak: 202deg;
-  --glass-opp-fade: 222deg;
-}
-
-/* f — Roll/Clear: две узкие искорки, умеренная + слабая */
-.action-bar button.glass-f {
-  --glass-glow-opacity: 0.4;
-  --glass-glow-peak: 15deg;
-  --glass-glow-fade: 30deg;
-  --glass-opp-opacity: 0.15;
-  --glass-opp-peak: 195deg;
-  --glass-opp-fade: 210deg;
-}
-
-/* g — Install: минимальный, очень спокойный симметричный */
-.action-bar button.glass-g {
-  --glass-glow-opacity: 0.22;
-  --glass-glow-peak: 18deg;
-  --glass-glow-fade: 38deg;
-  --glass-opp-opacity: 0.22;
-  --glass-opp-peak: 198deg;
-  --glass-opp-fade: 218deg;
 }
 
 .action-row--install {
