@@ -7,7 +7,7 @@ export function InstallButton() {
 
   return (
     <div className="action-row action-row--install">
-      <button className="glass-c" onClick={() => void install()}>Install</button>
+      <button className="glass-g" onClick={() => void install()}>Install</button>
     </div>
   );
 }
