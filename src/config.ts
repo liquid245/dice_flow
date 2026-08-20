@@ -135,5 +135,13 @@ export const config = {
       delete: 60,
       add: 20,
     },
+    thump: {
+      enabled: true,
+      frequency: 90,
+      frequencyEnd: 55,
+      duration: 70,
+      gain: 0.35,
+      click: true,
+    },
   },
 };

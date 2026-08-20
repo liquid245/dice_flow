@@ -1,22 +1,27 @@
 import { config } from '../config';
+import { playThump } from './audio';
 
 export type VibrationName = keyof typeof config.vibration.patterns;
 
 let sessionTimer: ReturnType<typeof setInterval> | null = null;
 
-function supported(): boolean {
+export function vibrationSupported(): boolean {
   return typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
 }
 
 export function vibrate(name: VibrationName): void {
-  if (!config.vibration.enabled || !supported()) return;
+  if (!config.vibration.enabled) return;
+  if (!vibrationSupported()) {
+    playThump();
+    return;
+  }
   const pattern = config.vibration.patterns[name];
   if (pattern === 0) return;
   navigator.vibrate(pattern);
 }
 
 export function vibrateSessionStart(): void {
-  if (!config.vibration.enabled || !config.vibration.session.enabled || !supported()) return;
+  if (!config.vibration.enabled || !config.vibration.session.enabled || !vibrationSupported()) return;
   if (sessionTimer != null) return;
   const { burstMs, intervalMs } = config.vibration.session;
   navigator.vibrate(burstMs);
@@ -28,5 +33,5 @@ export function vibrateSessionStop(): void {
     clearInterval(sessionTimer);
     sessionTimer = null;
   }
-  if (supported()) navigator.vibrate(0);
+  if (vibrationSupported()) navigator.vibrate(0);
 }
