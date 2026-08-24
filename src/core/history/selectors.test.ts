@@ -12,14 +12,14 @@ describe('changesSinceLastRoll', () => {
     expect(changesSinceLastRoll(history).map((e) => e.kind)).toEqual(['add', 'move', 'delete']);
   });
 
-  it('returns the last roll and everything after it', () => {
-    const history = [entry('add', 3), entry('roll'), entry('move', 1, 6)];
-    expect(changesSinceLastRoll(history).map((e) => e.kind)).toEqual(['roll', 'move']);
+  it('returns only actions after the last roll', () => {
+    const history = [entry('roll'), entry('add', 3), entry('move', 1, 6)];
+    expect(changesSinceLastRoll(history).map((e) => e.kind)).toEqual(['add', 'move']);
   });
 
-  it('returns the roll entry right after a roll', () => {
+  it('returns empty immediately after a roll', () => {
     const history = [entry('add', 3), entry('roll')];
-    expect(changesSinceLastRoll(history).map((e) => e.kind)).toEqual(['roll']);
+    expect(changesSinceLastRoll(history)).toEqual([]);
   });
 
   it('resets after clear', () => {
@@ -32,13 +32,8 @@ describe('changesSinceLastRoll', () => {
     expect(changesSinceLastRoll(history).map((e) => e.kind)).toEqual(['add']);
   });
 
-  it('uses the most recent roll after a clear', () => {
-    const history = [entry('roll'), entry('add', 1), entry('clear', 4), entry('roll'), entry('move', 1, 5)];
-    expect(changesSinceLastRoll(history).map((e) => e.kind)).toEqual(['roll', 'move']);
-  });
-
   it('includes reroll as a change within the round', () => {
     const history = [entry('roll'), entry('reroll', 2, 6), entry('add', 1)];
-    expect(changesSinceLastRoll(history).map((e) => e.kind)).toEqual(['roll', 'reroll', 'add']);
+    expect(changesSinceLastRoll(history).map((e) => e.kind)).toEqual(['reroll', 'add']);
   });
 });

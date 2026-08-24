@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { selectedDice } from '../../core/selection/selection';
 import { useGame } from '../../app/game';
 import { config, type ButtonKey } from '../../config';
@@ -10,40 +9,6 @@ export function ActionBar() {
   const hasDice = state.dice.length > 0;
 
   const isOn = (key: ButtonKey) => config.buttonVisibility[key];
-
-  useEffect(() => {
-    let pressTarget: HTMLElement | null = null;
-    const setPressPoint = (target: HTMLElement, clientX: number, clientY: number) => {
-      const rect = target.getBoundingClientRect();
-      const x = rect.width > 0 ? ((clientX - rect.left) / rect.width) * 100 : 50;
-      const y = rect.height > 0 ? ((clientY - rect.top) / rect.height) * 100 : 50;
-      target.style.setProperty('--press-x', `${x.toFixed(1)}%`);
-      target.style.setProperty('--press-y', `${y.toFixed(1)}%`);
-    };
-    const onPointerDown = (event: PointerEvent) => {
-      const target = (event.target as Element | null)?.closest?.('button');
-      if (!target) return;
-      pressTarget = target as HTMLElement;
-      setPressPoint(pressTarget, event.clientX, event.clientY);
-    };
-    const onPointerMove = (event: PointerEvent) => {
-      if (!pressTarget) return;
-      setPressPoint(pressTarget, event.clientX, event.clientY);
-    };
-    const onPointerEnd = () => {
-      pressTarget = null;
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('pointermove', onPointerMove, { passive: true });
-    document.addEventListener('pointerup', onPointerEnd);
-    document.addEventListener('pointercancel', onPointerEnd);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerup', onPointerEnd);
-      document.removeEventListener('pointercancel', onPointerEnd);
-    };
-  }, []);
 
   return (
     <div className="action-bar" style={{ borderTop: config.ui.panels.borders ? undefined : 'none' }}>

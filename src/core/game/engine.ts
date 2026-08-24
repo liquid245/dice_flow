@@ -41,25 +41,23 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
       return;
     }
 
-    const previous = state;
-    state = reduce(state, action, deps);
-    if (state === previous) return;
-
     const isMod = action.type === 'add' || action.type === 'delete';
     const coalesce = isMod && (lastAction === 'add' || lastAction === 'delete');
 
     if (inTransaction) {
       if (!transactionPushed) {
-        undoStack.push(previous);
+        undoStack.push(state);
         redoStack = [];
         transactionPushed = true;
       }
     } else if (!coalesce) {
-      undoStack.push(previous);
+      undoStack.push(state);
       redoStack = [];
     }
 
-    const entry = makeEntry(action, previous, state, deps);
+    const previous = state;
+    state = reduce(state, action, deps);
+    const entry = makeEntry(action, previous, deps);
     state = isMod ? mergeModEntry(state, entry) : appendEntry(state, entry);
 
     lastAction = action.type;
@@ -127,7 +125,6 @@ function selectedCount(state: GameState): number {
 function makeEntry(
   action: LoggableAction,
   previous: GameState,
-  next: GameState,
   deps: EngineDeps,
 ): HistoryEntry {
   const base = { id: deps.nextId(), timestamp: deps.now() };
@@ -136,17 +133,13 @@ function makeEntry(
       return { ...base, kind: 'roll', count: selectedCount(previous) };
     case 'reroll': {
       const selected = selectedDice(previous.dice, previous.selection);
-      const ids =
-        selected.length > 0
-          ? new Set(selected.map((d) => d.id))
-          : new Set(previous.dice.map((d) => d.id));
-      const rerolled = next.dice.filter((d) => ids.has(d.id));
-      const values = new Set(rerolled.map((d) => d.value));
+      const targets = selected.length > 0 ? selected : previous.dice;
+      const values = new Set(targets.map((d) => d.value));
       return {
         ...base,
         kind: 'reroll',
-        count: rerolled.length,
-        value: values.size === 1 ? rerolled[0].value : undefined,
+        count: targets.length,
+        value: values.size === 1 ? targets[0].value : undefined,
       };
     }
     case 'add':
