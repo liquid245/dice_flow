@@ -9,7 +9,7 @@ export function vibrationSupported(): boolean {
   return typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
 }
 
-export function vibrate(name: VibrationName): void {
+export function vibrate(name: VibrationName, opts?: { sound?: boolean }): void {
   if (!config.vibration.enabled) return;
   if (!vibrationSupported()) {
     playThump();
@@ -18,6 +18,7 @@ export function vibrate(name: VibrationName): void {
   const pattern = config.vibration.patterns[name];
   if (pattern === 0) return;
   navigator.vibrate(pattern);
+  if (opts?.sound) playThump();
 }
 
 export function vibrateSessionStart(): void {

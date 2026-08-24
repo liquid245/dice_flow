@@ -387,7 +387,7 @@ export class DiceRenderer {
     }
 
     if (selectionChanged && !layoutChanged && !isInitial) {
-      if (this.selected.size > 0) vibrate('select');
+      if (this.selected.size > 0) vibrate('select', { sound: true });
       this.startHaptics();
     }
 

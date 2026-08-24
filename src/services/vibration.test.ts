@@ -81,6 +81,14 @@ describe('vibration fallback to audio thump', () => {
     expect(playThump).toHaveBeenCalledTimes(1);
   });
 
+  it('plays a thump alongside vibration when sound is requested', () => {
+    const supportedVibrate = vi.fn<() => boolean>();
+    vi.stubGlobal('navigator', { vibrate: supportedVibrate });
+    vibrate('select', { sound: true });
+    expect(supportedVibrate).toHaveBeenCalled();
+    expect(playThump).toHaveBeenCalledTimes(1);
+  });
+
   it('does not play a thump when vibration is supported', () => {
     const supportedVibrate = vi.fn<() => boolean>();
     vi.stubGlobal('navigator', { vibrate: supportedVibrate });
