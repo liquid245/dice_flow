@@ -3,6 +3,10 @@
   --font-scale: 1;
 }
 
+html {
+  background: #121212;
+}
+
 body {
   margin: 0;
   background: #121212;
