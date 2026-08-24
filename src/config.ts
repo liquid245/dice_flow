@@ -6,7 +6,7 @@ export type ButtonKey = 'roll' | 'reroll' | 'add' | 'delete' | 'undo' | 'redo' |
 
 const buttons: Record<ButtonKey, string> = {
   roll: 'Roll',
-  reroll: 'ReRoll',
+  reroll: 'Reroll',
   add: 'Add',
   delete: 'Delete',
   undo: 'Undo',
@@ -106,12 +106,12 @@ export const config = {
     },
     infoPanel: {
       centered: true,
-      swipeHint: 'Swipe Finger to Add or Reduce Dices',
+      swipeHint: 'Swipe finger to add or reduce dices',
     },
     history: {
       kindLabels: {
         roll: 'Roll',
-        reroll: 'ReRoll',
+        reroll: 'Reroll',
         add: 'Add',
         delete: 'Delete',
         move: 'Move',
