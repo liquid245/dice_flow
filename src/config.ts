@@ -128,6 +128,7 @@ export const config = {
       enabled: true,
       burstMs: 20,
       intervalMs: 40,
+      stopIntensity: 0.05,
     },
     patterns: {
       roll: [40, 30, 40],

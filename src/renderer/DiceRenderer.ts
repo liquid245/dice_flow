@@ -11,7 +11,7 @@ import { startMotion, motionValue, motionProgress, motionDone, type Motion } fro
 import type { DieHit } from '../input/hitTest';
 import { config } from '../config';
 import { playSound, type SoundName } from '../services/audio';
-import { vibrate, vibrateSessionStart, vibrateSessionStop, type VibrationName } from '../services/vibration';
+import { vibrate, vibrateSessionSetIntensity, vibrateSessionStart, vibrateSessionStop, type VibrationName } from '../services/vibration';
 import { plateOpacity } from './plateOpacity';
 
 interface DieInstance {
@@ -853,20 +853,39 @@ export class DiceRenderer {
   }
 
   private tick = (now: number) => {
+    if (this.hapticActive) {
+      const intensity = this.hapticIntensity(now);
+      if (intensity <= config.vibration.session.stopIntensity) {
+        this.stopHaptics();
+      } else {
+        vibrateSessionSetIntensity(intensity);
+      }
+    }
+
     const motion = this.advanceDiceMotions(now);
     this.applyShake(now);
     const camera = this.stepCamera(now);
     const fading = this.stepPlateFade(now);
     this.render();
 
-    if (this.hapticActive && !motion && this.shakeIds.size === 0) {
-      this.hapticActive = false;
-      vibrateSessionStop();
-    }
-
-    const active = motion || this.shakeIds.size > 0 || fading || camera;
+    const active = motion || this.shakeIds.size > 0 || fading || camera || this.hapticActive;
     this.rafId = active ? requestAnimationFrame(this.tick) : null;
   };
+
+  private hapticIntensity(now: number): number {
+    let intensity = 0;
+    for (let i = 0; i < this.slots.length; i++) {
+      const die = this.slots[i];
+      if (this.idSlot.get(die.id) !== i || die.dying) continue;
+      if (die.shakeAmp > intensity) intensity = die.shakeAmp;
+      if (die.mspin) {
+        const p = motionProgress(die.mspin, now);
+        const energy = (1 - p) * (1 - p);
+        if (energy > intensity) intensity = energy;
+      }
+    }
+    return intensity;
+  }
 
   private stopHaptics(): void {
     if (!this.hapticActive) return;
@@ -876,6 +895,7 @@ export class DiceRenderer {
 
   private startHaptics(): void {
     this.hapticActive = true;
+    vibrateSessionSetIntensity(1);
     vibrateSessionStart();
   }
 

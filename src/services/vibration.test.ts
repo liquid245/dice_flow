@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { config } from '../config';
 import { playThump } from './audio';
-import { vibrate, vibrateSessionStart, vibrateSessionStop } from './vibration';
+import { vibrate, vibrateSessionSetIntensity, vibrateSessionStart, vibrateSessionStop } from './vibration';
 
 vi.mock('./audio', () => ({ playThump: vi.fn() }));
 
@@ -58,6 +58,40 @@ describe('vibration', () => {
     vibrateSessionStart();
     vi.advanceTimersByTime(3 * config.vibration.session.intervalMs);
     expect(vibrateMock).not.toHaveBeenCalled();
+  });
+
+  it('session bursts scale with intensity', () => {
+    vibrateSessionStart();
+    vibrateSessionSetIntensity(0.5);
+    vi.advanceTimersByTime(config.vibration.session.intervalMs);
+    expect(vibrateMock).toHaveBeenLastCalledWith(Math.round(config.vibration.session.burstMs * 0.5));
+  });
+
+  it('session skips bursts at zero intensity', () => {
+    vibrateSessionStart();
+    vibrateSessionSetIntensity(0);
+    const count = vibrateMock.mock.calls.length;
+    vi.advanceTimersByTime(3 * config.vibration.session.intervalMs);
+    expect(vibrateMock.mock.calls.length).toBe(count);
+  });
+
+  it('intensity clamps to [0, 1]', () => {
+    vibrateSessionStart();
+    vibrateSessionSetIntensity(3);
+    vi.advanceTimersByTime(config.vibration.session.intervalMs);
+    expect(vibrateMock).toHaveBeenLastCalledWith(config.vibration.session.burstMs);
+    const count = vibrateMock.mock.calls.length;
+    vibrateSessionSetIntensity(-1);
+    vi.advanceTimersByTime(config.vibration.session.intervalMs);
+    expect(vibrateMock.mock.calls.length).toBe(count);
+  });
+
+  it('intensity resets to full after stop', () => {
+    vibrateSessionStart();
+    vibrateSessionSetIntensity(0.25);
+    vibrateSessionStop();
+    vibrateSessionStart();
+    expect(vibrateMock).toHaveBeenLastCalledWith(config.vibration.session.burstMs);
   });
 });
 
