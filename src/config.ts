@@ -25,13 +25,15 @@ const buttonVisibility: Record<ButtonKey, boolean> = {
 };
 
 // Поворот (x, y, z) в радианах, чтобы грань с этим значением смотрела на камеру (+Z).
+// Раскладка для модели dice-2.glb: +X=6, -X=1, +Y=5, -Y=2, +Z=3, -Z=4.
+// Старая модель dice.glb: 1:[0,PI/2,0], 2:[0,-PI/2,0], 3:[-PI/2,0,0], 4:[PI/2,0,0], 5:[0,PI,0], 6:[0,0,0].
 const diceFaces: Record<number, DiceFaceRotation> = {
   1: [0, Math.PI / 2, 0],
-  2: [0, -Math.PI / 2, 0],
-  3: [-Math.PI / 2, 0, 0],
-  4: [Math.PI / 2, 0, 0],
-  5: [0, Math.PI, 0],
-  6: [0, 0, 0],
+  2: [-Math.PI / 2, 0, 0],
+  3: [0, 0, 0],
+  4: [0, Math.PI, 0],
+  5: [Math.PI / 2, 0, 0],
+  6: [0, -Math.PI / 2, 0],
 };
 
 export const config = {
@@ -94,7 +96,8 @@ export const config = {
       roll: `${base}sounds/629982__flem0527__dice-rolling-on-table.wav`,
       disappear: `${base}sounds/poof.wav`,
     },
-    diceModel: `${base}models/dice.glb`,
+    // old model: ${base}models/dice.glb (для отката — файл и строки сохранены)
+    diceModel: `${base}models/dice-2.glb`,
     diceFaces,
   },
   buttons,

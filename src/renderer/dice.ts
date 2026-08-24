@@ -39,7 +39,9 @@ function mergeByMaterial(scene: THREE.Object3D): LodGroup[] {
   const size = box.getSize(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z) || 1;
   const scale = config.layout.dieSize / maxDim;
+  const center = box.getCenter(new THREE.Vector3());
   for (const group of groups) {
+    group.geometry.translate(-center.x, -center.y, -center.z);
     group.geometry.scale(scale, scale, scale);
     group.geometry.computeBoundingBox();
     group.geometry.computeBoundingSphere();
