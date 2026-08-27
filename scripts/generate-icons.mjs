@@ -38,9 +38,13 @@ function waitForServer() {
   });
 }
 
-function render(out, fill) {
-  const query = fill ? `?fill=${fill}` : '';
-  const url = `http://127.0.0.1:${port}/icon-render.html${query}`;
+function render(out, { theme = 'light', fill = null, view = null, face = null } = {}) {
+  const params = new URLSearchParams();
+  params.set('theme', theme);
+  if (fill) params.set('fill', String(fill));
+  if (view !== null) params.set('view', String(view));
+  if (face !== null) params.set('face', String(face));
+  const url = `http://127.0.0.1:${port}/icon-render.html?${params}`;
   run(chrome, [
     '--headless=new',
     '--use-angle=swiftshader',
@@ -51,6 +55,7 @@ function render(out, fill) {
     '--window-size=1024,1024',
     '--default-background-color=00000000',
     '--virtual-time-budget=15000',
+    '--timeout=25000',
     `--screenshot=${out}`,
     url,
   ]);
@@ -104,29 +109,62 @@ const server = spawn(process.execPath, ['-e', serverCode], { stdio: 'ignore' });
 try {
   await waitForServer();
 
-  const master = join(tmp, 'die-master.png');
-  render(master, null);
+  const masters = {
+    light: { master: join(tmp, 'die-light-master.png'), maskable: join(tmp, 'die-light-maskable.png') },
+    dark: { master: join(tmp, 'die-dark-master.png'), maskable: join(tmp, 'die-dark-maskable.png') },
+    tinted: { master: join(tmp, 'die-tinted-master.png'), maskable: null },
+  };
 
-  if (target === 'preview') {
-    run('open', ['-a', 'Preview', master]);
-    console.log(`Preview: ${master}`);
-    console.log(`Open again: open -a Preview ${master}`);
+  render(masters.light.master, { theme: 'light' });
+  render(masters.light.maskable, { theme: 'light', fill: 0.78 });
+  render(masters.dark.master, { theme: 'dark' });
+  render(masters.dark.maskable, { theme: 'dark', fill: 0.78 });
+  render(masters.tinted.master, { theme: 'tinted' });
+
+  if (target === 'probe') {
+    const probes = [];
+    for (let v = 0; v < 7; v++) {
+      probes.push(join(tmp, `probe-light-${v}.png`));
+    }
+    for (let v = 0; v < 7; v++) {
+      render(probes[v], { theme: 'light', view: v });
+    }
+    run('open', ['-a', 'Preview', ...probes]);
+    console.log('Probes:', probes.join(' '));
     process.exit(0);
   }
 
-  const maskableMaster = join(tmp, 'die-maskable-master.png');
-  render(maskableMaster, 0.78);
+  if (target === 'preview') {
+    run('open', ['-a', 'Preview', masters.light.master, masters.dark.master, masters.tinted.master]);
+    console.log(`Preview: ${masters.light.master}`);
+    console.log(`Open again: open -a Preview ${masters.light.master} ${masters.dark.master} ${masters.tinted.master}`);
+    process.exit(0);
+  }
 
-  const icons = [
+  const resize = (w, h, src, out) => run('sips', ['-z', String(h), String(w), src, '--out', out]);
+
+  const lightOutputs = [
     [512, 512, join(root, 'public', 'icons', 'icon-512.png')],
     [192, 192, join(root, 'public', 'icons', 'icon-192.png')],
     [32, 32, join(root, 'public', 'icons', 'favicon-32.png')],
     [16, 16, join(root, 'public', 'icons', 'favicon-16.png')],
     [180, 180, join(root, 'public', 'apple-touch-icon.png')],
   ];
-  for (const [w, h, out] of icons) run('sips', ['-z', String(h), String(w), master, '--out', out]);
+  for (const [w, h, out] of lightOutputs) resize(w, h, masters.light.master, out);
 
-  run('sips', ['-z', '512', '512', maskableMaster, '--out', join(root, 'public', 'icons', 'maskable-512.png')]);
+  const darkOutputs = [
+    [512, 512, join(root, 'public', 'icons', 'icon-dark-512.png')],
+    [192, 192, join(root, 'public', 'icons', 'icon-dark-192.png')],
+    [32, 32, join(root, 'public', 'icons', 'favicon-32-dark.png')],
+    [16, 16, join(root, 'public', 'icons', 'favicon-16-dark.png')],
+    [180, 180, join(root, 'public', 'apple-touch-icon-dark.png')],
+  ];
+  for (const [w, h, out] of darkOutputs) resize(w, h, masters.dark.master, out);
+
+  resize(512, 512, masters.light.maskable, join(root, 'public', 'icons', 'maskable-512.png'));
+  resize(512, 512, masters.dark.maskable, join(root, 'public', 'icons', 'maskable-dark-512.png'));
+
+  resize(180, 180, masters.tinted.master, join(root, 'public', 'apple-touch-icon-tinted.png'));
 
   console.log('Icons generated.');
 } finally {

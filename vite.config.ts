@@ -22,7 +22,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['icons/*.png', 'apple-touch-icon.png', 'models/*.glb', 'sounds/*.wav'],
+      includeAssets: ['icons/*.png', 'apple-touch-icon*.png', 'models/*.glb', 'sounds/*.wav'],
       manifest: {
         name: 'DiceFlow',
         short_name: 'DiceFlow',
