@@ -98,8 +98,9 @@ export class DiceRenderer {
   private ndcVec = new THREE.Vector2();
 
   constructor(private container: HTMLElement) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setClearColor(0x000000, 0);
     const canvas = this.renderer.domElement;
     canvas.style.position = 'absolute';
     canvas.style.inset = '0';

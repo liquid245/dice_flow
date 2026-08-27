@@ -60,7 +60,7 @@ body {
   padding-right: calc(16px + env(safe-area-inset-right, 0px));
   text-align: center;
   font-size: calc(var(--font-scale) * 10px);
-  color: rgba(255, 255, 255, 0.35);
+  color: #656565;
   pointer-events: none;
   user-select: none;
 }
