@@ -35,10 +35,19 @@ export function preloadSounds(): void {
 export function unlockAudio(): void {
   if (unlocked) return;
   unlocked = true;
-  const resume = () => context();
-  window.addEventListener('pointerdown', resume, { once: true });
-  window.addEventListener('touchstart', resume, { once: true });
-  window.addEventListener('keydown', resume, { once: true });
+  const unlock = () => {
+    const ctx = context();
+    if (ctx.state === 'running') return;
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0);
+  };
+  const opts: AddEventListenerOptions = { once: true, passive: true };
+  window.addEventListener('pointerdown', unlock, opts);
+  window.addEventListener('touchstart', unlock, opts);
+  window.addEventListener('keydown', unlock, opts);
 }
 
 export function playSound(name: SoundName): void {
