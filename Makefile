@@ -33,3 +33,6 @@ cert:
 
 serve: build
 	node scripts/serve.mjs
+
+icons:
+	node scripts/generate-icons.mjs
