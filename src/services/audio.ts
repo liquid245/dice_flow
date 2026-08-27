@@ -5,6 +5,7 @@ type SampleName = keyof typeof config.assets.sounds;
 export type SoundName = SampleName | 'select' | 'thump';
 
 let ctx: AudioContext | null = null;
+let resumePromise: Promise<void> | null = null;
 const buffers = new Map<SampleName, AudioBuffer>();
 const activeSources = new Set<AudioBufferSourceNode>();
 let preloadStarted = false;
@@ -18,12 +19,19 @@ function context(): AudioContext {
 async function ensureRunning(): Promise<void> {
   const c = context();
   if (c.state === 'running') return;
-  await Promise.race([
-    c.resume().catch(() => {}),
-    new Promise<void>((resolve) => {
-      setTimeout(resolve, 500);
-    }),
-  ]);
+  if (!resumePromise) {
+    resumePromise = Promise.race([
+      c.resume(),
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, 500);
+      }),
+    ])
+      .catch(() => {})
+      .finally(() => {
+        resumePromise = null;
+      });
+  }
+  await resumePromise;
 }
 
 async function loadSample(name: SampleName): Promise<AudioBuffer | null> {
@@ -59,7 +67,7 @@ export function unlockAudio(): void {
     source.buffer = buffer;
     source.connect(c.destination);
     source.start(0);
-    c.resume().catch(() => {});
+    void ensureRunning();
   };
   const opts: AddEventListenerOptions = { passive: true };
   const events = ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'] as const;
