@@ -53,7 +53,7 @@ async function loadSample(name: SampleName): Promise<AudioBuffer | null> {
   try {
     const response = await fetch(config.assets.sounds[name]);
     const arrayBuffer = await response.arrayBuffer();
-    const audioBuffer = await context().decodeAudioData(arrayBuffer);
+    const audioBuffer = await new OfflineAudioContext(1, 1, 44100).decodeAudioData(arrayBuffer);
     if (audioBuffer) buffers.set(name, audioBuffer);
     return audioBuffer;
   } catch {

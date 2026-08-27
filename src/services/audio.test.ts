@@ -87,4 +87,22 @@ describe('audio play', () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(audioCtx.createBufferSource).not.toHaveBeenCalled();
   });
+
+  it('preloads and decodes samples via OfflineAudioContext', async () => {
+    const decode = vi.fn(async () => ({}) as AudioBuffer);
+    vi.stubGlobal(
+      'OfflineAudioContext',
+      function () {
+        return { decodeAudioData: decode };
+      } as unknown as typeof OfflineAudioContext,
+    );
+    vi.stubGlobal('fetch', vi.fn(async () => ({ arrayBuffer: async () => new ArrayBuffer(8) })) as unknown as typeof fetch);
+    const { preloadSounds, play } = await freshAudio();
+    preloadSounds();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(decode).toHaveBeenCalledTimes(3);
+    audioCtx.state = 'running';
+    play('appear');
+    expect(audioCtx.createBufferSource).toHaveBeenCalled();
+  });
 });
