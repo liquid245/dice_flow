@@ -29,11 +29,11 @@ const buttonVisibility: Record<ButtonKey, boolean> = {
 // Старая модель dice.glb: 1:[0,PI/2,0], 2:[0,-PI/2,0], 3:[-PI/2,0,0], 4:[PI/2,0,0], 5:[0,PI,0], 6:[0,0,0].
 const diceFaces: Record<number, DiceFaceRotation> = {
   1: [0, Math.PI / 2, 0],
-  2: [-Math.PI / 2, 0, 0],
+  2: [-Math.PI / 2, -Math.PI / 2, 0],
   3: [0, 0, 0],
   4: [0, Math.PI, 0],
   5: [Math.PI / 2, 0, 0],
-  6: [0, -Math.PI / 2, 0],
+  6: [Math.PI / 2, 0, Math.PI / 2],
 };
 
 export const config = {
