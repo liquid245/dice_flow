@@ -16,12 +16,18 @@ function context(): AudioContext {
   return ctx;
 }
 
-async function load(name: SoundName): Promise<void> {
-  if (buffers.has(name)) return;
-  const response = await fetch(config.assets.sounds[name]);
-  const arrayBuffer = await response.arrayBuffer();
-  const audioBuffer = await context().decodeAudioData(arrayBuffer);
-  buffers.set(name, audioBuffer);
+async function load(name: SoundName): Promise<AudioBuffer | null> {
+  const existing = buffers.get(name);
+  if (existing) return existing;
+  try {
+    const response = await fetch(config.assets.sounds[name]);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await context().decodeAudioData(arrayBuffer);
+    if (audioBuffer) buffers.set(name, audioBuffer);
+    return audioBuffer;
+  } catch {
+    return null;
+  }
 }
 
 export function preloadSounds(): void {
@@ -53,7 +59,9 @@ export function unlockAudio(): void {
 export function playSound(name: SoundName): void {
   const buffer = buffers.get(name);
   if (!buffer) {
-    void load(name);
+    void load(name).then((b) => {
+      if (b) playSound(name);
+    });
     return;
   }
   const ctx = context();
