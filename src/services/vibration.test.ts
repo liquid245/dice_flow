@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { config } from '../config';
-import { playThump } from './audio';
+import { play } from './audio';
 import { vibrate, vibrateSessionSetIntensity, vibrateSessionStart, vibrateSessionStop } from './vibration';
 
-vi.mock('./audio', () => ({ playThump: vi.fn() }));
+vi.mock('./audio', () => ({ play: vi.fn() }));
 
 describe('vibration', () => {
   const vibrateMock = vi.fn<() => boolean>();
@@ -99,7 +99,7 @@ describe('vibration fallback to audio thump', () => {
   beforeEach(() => {
     vi.stubGlobal('navigator', { vibrate: undefined });
     vi.useFakeTimers();
-    vi.mocked(playThump).mockClear();
+    vi.mocked(play).mockClear();
     config.vibration.enabled = true;
     config.vibration.thump.enabled = true;
   });
@@ -112,15 +112,7 @@ describe('vibration fallback to audio thump', () => {
 
   it('plays a thump when vibration is unsupported', () => {
     vibrate('roll');
-    expect(playThump).toHaveBeenCalledTimes(1);
-  });
-
-  it('plays a thump alongside vibration when sound is requested', () => {
-    const supportedVibrate = vi.fn<() => boolean>();
-    vi.stubGlobal('navigator', { vibrate: supportedVibrate });
-    vibrate('select', { sound: true });
-    expect(supportedVibrate).toHaveBeenCalled();
-    expect(playThump).toHaveBeenCalledTimes(1);
+    expect(play).toHaveBeenCalledWith('thump');
   });
 
   it('does not play a thump when vibration is supported', () => {
@@ -128,18 +120,18 @@ describe('vibration fallback to audio thump', () => {
     vi.stubGlobal('navigator', { vibrate: supportedVibrate });
     vibrate('roll');
     expect(supportedVibrate).toHaveBeenCalled();
-    expect(playThump).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
   });
 
   it('does not play a thump when vibration is disabled entirely', () => {
     config.vibration.enabled = false;
     vibrate('roll');
-    expect(playThump).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
   });
 
   it('session start is a no-op when unsupported', () => {
     vibrateSessionStart();
     vi.advanceTimersByTime(3 * config.vibration.session.intervalMs);
-    expect(playThump).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
   });
 });

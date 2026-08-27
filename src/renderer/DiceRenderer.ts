@@ -10,7 +10,7 @@ import { computeTransitions, type DieSnapshot, type Transition } from './animato
 import { startMotion, motionValue, motionProgress, motionDone, type Motion } from './motion';
 import type { DieHit } from '../input/hitTest';
 import { config } from '../config';
-import { playSound, type SoundName } from '../services/audio';
+import { play, type SoundName } from '../services/audio';
 import { vibrate, vibrateSessionSetIntensity, vibrateSessionStart, vibrateSessionStop, type VibrationName } from '../services/vibration';
 import { plateOpacity } from './plateOpacity';
 
@@ -387,7 +387,10 @@ export class DiceRenderer {
     }
 
     if (selectionChanged && !layoutChanged && !isInitial) {
-      if (this.selected.size > 0) vibrate('select', { sound: true });
+      if (this.selected.size > 0) {
+        play('select');
+        vibrate('select');
+      }
       this.startHaptics();
     }
 
@@ -419,7 +422,7 @@ export class DiceRenderer {
         this.applyTransition(transition, sounds, vibrations);
       }
     }
-    for (const sound of sounds) playSound(sound);
+    for (const sound of sounds) play(sound);
     for (const vibration of vibrations) vibrate(vibration);
     if (vibrations.size > 0) this.startHaptics();
 

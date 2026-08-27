@@ -1,11 +1,11 @@
 import { config } from '../config';
 
-type SoundName = keyof typeof config.assets.sounds;
+type SampleName = keyof typeof config.assets.sounds;
 
-export type { SoundName };
+export type SoundName = SampleName | 'select' | 'thump';
 
 let ctx: AudioContext | null = null;
-const buffers = new Map<SoundName, AudioBuffer>();
+const buffers = new Map<SampleName, AudioBuffer>();
 const activeSources = new Set<AudioBufferSourceNode>();
 let preloadStarted = false;
 let unlocked = false;
@@ -26,7 +26,7 @@ async function ensureRunning(): Promise<void> {
   ]);
 }
 
-async function load(name: SoundName): Promise<AudioBuffer | null> {
+async function loadSample(name: SampleName): Promise<AudioBuffer | null> {
   const existing = buffers.get(name);
   if (existing) return existing;
   try {
@@ -43,8 +43,8 @@ async function load(name: SoundName): Promise<AudioBuffer | null> {
 export function preloadSounds(): void {
   if (preloadStarted) return;
   preloadStarted = true;
-  for (const name of Object.keys(config.assets.sounds) as SoundName[]) {
-    void load(name);
+  for (const name of Object.keys(config.assets.sounds) as SampleName[]) {
+    void loadSample(name);
   }
 }
 
@@ -66,14 +66,7 @@ export function unlockAudio(): void {
   for (const event of events) window.addEventListener(event, unlock, opts);
 }
 
-export function playSound(name: SoundName): void {
-  const buffer = buffers.get(name);
-  if (!buffer) {
-    void load(name).then((b) => {
-      if (b) playSound(name);
-    });
-    return;
-  }
+function playBuffer(buffer: AudioBuffer): void {
   void (async () => {
     await ensureRunning();
     const c = context();
@@ -86,7 +79,26 @@ export function playSound(name: SoundName): void {
   })();
 }
 
-export function playThump(): void {
+function synthClick(): void {
+  void (async () => {
+    await ensureRunning();
+    const c = context();
+    const length = Math.max(1, Math.floor(c.sampleRate * 0.006));
+    const buffer = c.createBuffer(1, length, c.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length);
+    const source = c.createBufferSource();
+    source.buffer = buffer;
+    const gain = c.createGain();
+    gain.gain.value = 0.5;
+    source.connect(gain).connect(c.destination);
+    source.start();
+    activeSources.add(source);
+    source.onended = () => activeSources.delete(source);
+  })();
+}
+
+function synthThump(): void {
   const t = config.vibration.thump;
   if (!t.enabled) return;
   void (async () => {
@@ -121,4 +133,23 @@ export function playThump(): void {
       source.start(now);
     }
   })();
+}
+
+export function play(name: SoundName): void {
+  if (name === 'thump') {
+    synthThump();
+    return;
+  }
+  if (name === 'select') {
+    synthClick();
+    return;
+  }
+  const buffer = buffers.get(name);
+  if (!buffer) {
+    void loadSample(name).then((b) => {
+      if (b) play(name);
+    });
+    return;
+  }
+  playBuffer(buffer);
 }

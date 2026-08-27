@@ -1,5 +1,5 @@
 import { config } from '../config';
-import { playThump } from './audio';
+import { play } from './audio';
 
 export type VibrationName = keyof typeof config.vibration.patterns;
 
@@ -22,16 +22,15 @@ export function vibrationSupported(): boolean {
   return typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
 }
 
-export function vibrate(name: VibrationName, opts?: { sound?: boolean }): void {
+export function vibrate(name: VibrationName): void {
   if (!config.vibration.enabled) return;
   if (!vibrationSupported()) {
-    playThump();
+    play('thump');
     return;
   }
   const pattern = config.vibration.patterns[name];
   if (pattern === 0) return;
   navigator.vibrate(pattern);
-  if (opts?.sound) playThump();
 }
 
 export function vibrateSessionStart(): void {
