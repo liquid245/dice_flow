@@ -5,33 +5,43 @@ type SampleName = keyof typeof config.assets.sounds;
 export type SoundName = SampleName | 'select' | 'thump';
 
 let ctx: AudioContext | null = null;
-let resumePromise: Promise<void> | null = null;
 const buffers = new Map<SampleName, AudioBuffer>();
 const activeSources = new Set<AudioBufferSourceNode>();
 let preloadStarted = false;
 let unlocked = false;
+
+const pending: Array<() => void> = [];
+let draining = false;
 
 function context(): AudioContext {
   if (!ctx) ctx = new AudioContext();
   return ctx;
 }
 
-async function ensureRunning(): Promise<void> {
-  const c = context();
-  if (c.state === 'running') return;
-  if (!resumePromise) {
-    resumePromise = Promise.race([
-      c.resume(),
-      new Promise<void>((resolve) => {
-        setTimeout(resolve, 500);
-      }),
-    ])
-      .catch(() => {})
-      .finally(() => {
-        resumePromise = null;
-      });
+function playWhenRunning(fn: () => void): void {
+  pending.push(fn);
+  void drainPending();
+}
+
+async function drainPending(): Promise<void> {
+  if (draining) return;
+  draining = true;
+  let resumeKicked = false;
+  while (pending.length > 0) {
+    const c = context();
+    if (c.state === 'running') {
+      resumeKicked = false;
+      const batch = pending.splice(0);
+      for (const fn of batch) fn();
+      continue;
+    }
+    if (!resumeKicked) {
+      resumeKicked = true;
+      c.resume().catch(() => {});
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
   }
-  await resumePromise;
+  draining = false;
 }
 
 async function loadSample(name: SampleName): Promise<AudioBuffer | null> {
@@ -67,7 +77,7 @@ export function unlockAudio(): void {
     source.buffer = buffer;
     source.connect(c.destination);
     source.start(0);
-    void ensureRunning();
+    c.resume().catch(() => {});
   };
   const opts: AddEventListenerOptions = { passive: true };
   const events = ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'] as const;
@@ -75,8 +85,7 @@ export function unlockAudio(): void {
 }
 
 function playBuffer(buffer: AudioBuffer): void {
-  void (async () => {
-    await ensureRunning();
+  playWhenRunning(() => {
     const c = context();
     const source = c.createBufferSource();
     source.buffer = buffer;
@@ -84,12 +93,11 @@ function playBuffer(buffer: AudioBuffer): void {
     source.start();
     activeSources.add(source);
     source.onended = () => activeSources.delete(source);
-  })();
+  });
 }
 
 function synthClick(): void {
-  void (async () => {
-    await ensureRunning();
+  playWhenRunning(() => {
     const c = context();
     const length = Math.max(1, Math.floor(c.sampleRate * 0.006));
     const buffer = c.createBuffer(1, length, c.sampleRate);
@@ -103,14 +111,13 @@ function synthClick(): void {
     source.start();
     activeSources.add(source);
     source.onended = () => activeSources.delete(source);
-  })();
+  });
 }
 
 function synthThump(): void {
   const t = config.vibration.thump;
   if (!t.enabled) return;
-  void (async () => {
-    await ensureRunning();
+  playWhenRunning(() => {
     const c = context();
     const now = c.currentTime;
     const duration = t.duration / 1000;
@@ -140,7 +147,7 @@ function synthThump(): void {
       source.connect(clickGain).connect(c.destination);
       source.start(now);
     }
-  })();
+  });
 }
 
 export function play(name: SoundName): void {
