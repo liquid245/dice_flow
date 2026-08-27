@@ -5,6 +5,7 @@ import type { GameState } from '../core/game/state';
 import type { DiceId, Die } from '../core/dice/types';
 import { isDieSelected } from '../core/selection/selection';
 import { loadDiceModel, type LodGroup } from './dice';
+import { compactSlots } from './compactSlots';
 import { layout, type Layout } from './layout';
 import { computeTransitions, type DieSnapshot, type Transition } from './animator';
 import { startMotion, motionValue, motionProgress, motionDone, type Motion } from './motion';
@@ -69,6 +70,7 @@ export class DiceRenderer {
   private synced = false;
   private dirty = false;
   private hapticActive = false;
+  private pendingShrink = false;
 
   private dragId: DiceId | null = null;
   private dragSolo = false;
@@ -401,6 +403,8 @@ export class DiceRenderer {
     this.writeIdleMatrices(now);
     this.applyShake(now);
     this.updatePlateHighlights();
+    if (this.rafId === null) this.maybeShrink();
+    else this.pendingShrink = true;
     this.render();
   }
 
@@ -613,6 +617,20 @@ export class DiceRenderer {
       this.scene.add(mesh);
     }
     this.dirty = true;
+  }
+
+  private maybeShrink(): void {
+    this.pendingShrink = false;
+    if (this.capacity <= DEFAULT_CAPACITY) return;
+    const liveCount = this.lastState?.dice.length ?? 0;
+    if (liveCount * 2 > this.slots.length) return;
+    const compacted = compactSlots(this.slots, this.idSlot);
+    this.slots = compacted.slots;
+    this.idSlot = compacted.idSlot;
+    this.freeSlots = [];
+    this.capacity = Math.max(DEFAULT_CAPACITY, this.slots.length * 2);
+    this.rebuildInstanced();
+    this.writeAllMatrices(performance.now());
   }
 
   private reconcileSelection(state: GameState, now: number): boolean {
@@ -872,7 +890,15 @@ export class DiceRenderer {
     this.render();
 
     const active = motion || this.shakeIds.size > 0 || fading || camera || this.hapticActive;
-    this.rafId = active ? requestAnimationFrame(this.tick) : null;
+    if (active) {
+      this.rafId = requestAnimationFrame(this.tick);
+    } else {
+      this.rafId = null;
+      if (this.pendingShrink) {
+        this.maybeShrink();
+        this.render();
+      }
+    }
   };
 
   private hapticIntensity(now: number): number {
