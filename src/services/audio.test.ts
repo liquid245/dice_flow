@@ -62,6 +62,16 @@ describe('audio play', () => {
     expect(audioCtx.createBufferSource).toHaveBeenCalled();
   });
 
+  it('drops sounds queued too long while suspended', async () => {
+    audioCtx.resume = vi.fn(() => Promise.resolve());
+    const { play } = await freshAudio();
+    play('select');
+    await vi.advanceTimersByTimeAsync(600);
+    audioCtx.state = 'running';
+    await vi.advanceTimersByTimeAsync(100);
+    expect(audioCtx.createBufferSource).not.toHaveBeenCalled();
+  });
+
   it('plays immediately when the context is already running', async () => {
     audioCtx.state = 'running';
     const { play } = await freshAudio();

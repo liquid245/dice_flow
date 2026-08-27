@@ -10,7 +10,9 @@ const activeSources = new Set<AudioBufferSourceNode>();
 let preloadStarted = false;
 let unlocked = false;
 
-const pending: Array<() => void> = [];
+const STALE_MS = 500;
+
+const pending: Array<{ fn: () => void; at: number }> = [];
 let draining = false;
 
 function context(): AudioContext {
@@ -19,7 +21,7 @@ function context(): AudioContext {
 }
 
 function playWhenRunning(fn: () => void): void {
-  pending.push(fn);
+  pending.push({ fn, at: Date.now() });
   void drainPending();
 }
 
@@ -31,8 +33,9 @@ async function drainPending(): Promise<void> {
     const c = context();
     if (c.state === 'running') {
       resumeKicked = false;
-      const batch = pending.splice(0);
-      for (const fn of batch) fn();
+      const now = Date.now();
+      const batch = pending.splice(0).filter((item) => now - item.at < STALE_MS);
+      for (const item of batch) item.fn();
       continue;
     }
     if (!resumeKicked) {
@@ -69,15 +72,21 @@ export function preloadSounds(): void {
 export function unlockAudio(): void {
   if (unlocked) return;
   unlocked = true;
+  let recreated = false;
   const unlock = () => {
     const c = context();
     if (c.state === 'running') return;
-    const buffer = c.createBuffer(1, 1, 22050);
-    const source = c.createBufferSource();
+    if (!recreated) {
+      recreated = true;
+      ctx = new AudioContext();
+    }
+    const cur = context();
+    const buffer = cur.createBuffer(1, 1, 22050);
+    const source = cur.createBufferSource();
     source.buffer = buffer;
-    source.connect(c.destination);
+    source.connect(cur.destination);
     source.start(0);
-    c.resume().catch(() => {});
+    cur.resume().catch(() => {});
   };
   const opts: AddEventListenerOptions = { passive: true };
   const events = ['pointerdown', 'touchstart', 'touchend', 'pointerup', 'click', 'keydown'] as const;
