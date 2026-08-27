@@ -49,7 +49,7 @@ const THEMES: Record<string, ThemeConfig> = {
   tinted: {
     body: 0x2e2e36,
     pips: 0xffffff,
-    roughness: 0.3,
+    roughness: 0.2,
     envIntensity: 1,
     background: 'linear-gradient(135deg, #34343b 0%, #1e1e24 55%, #111115 100%)',
     rounded: true,

@@ -1,4 +1,4 @@
-.PHONY: install dev build test test-watch typecheck lint preview cert serve
+.PHONY: install dev build test test-watch typecheck lint preview cert serve models
 
 install:
 	npm install
@@ -36,3 +36,6 @@ serve: build
 
 icons:
 	node scripts/generate-icons.mjs
+
+models:
+	node scripts/generate-dice-models.mjs
