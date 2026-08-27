@@ -80,7 +80,7 @@ export function unlockAudio(): void {
     c.resume().catch(() => {});
   };
   const opts: AddEventListenerOptions = { passive: true };
-  const events = ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'] as const;
+  const events = ['pointerdown', 'touchstart', 'touchend', 'pointerup', 'click', 'keydown'] as const;
   for (const event of events) window.addEventListener(event, unlock, opts);
 }
 
