@@ -25,15 +25,16 @@ const buttonVisibility: Record<ButtonKey, boolean> = {
 };
 
 // Поворот (x, y, z) в радианах, чтобы грань с этим значением смотрела на камеру (+Z).
-// Раскладка для модели dice-2.glb: +X=6, -X=1, +Y=5, -Y=2, +Z=3, -Z=4.
-// Старая модель dice.glb: 1:[0,PI/2,0], 2:[0,-PI/2,0], 3:[-PI/2,0,0], 4:[PI/2,0,0], 5:[0,PI,0], 6:[0,0,0].
+// Рендерер работает в мировых координатах (mergeByMaterial применяет matrixWorld),
+// поэтому тут мировые грани модели dice-2.glb: +X=6, -X=1, +Y=3, -Y=4, +Z=2, -Z=5.
+// Локальные грани модели: +X=6, -X=1, +Y=5, -Y=2, +Z=3, -Z=4 (из-за поворота корня сцены).
 const diceFaces: Record<number, DiceFaceRotation> = {
   1: [0, Math.PI / 2, 0],
-  2: [-Math.PI / 2, -Math.PI / 2, 0],
-  3: [0, 0, 0],
-  4: [0, Math.PI, 0],
-  5: [Math.PI / 2, 0, 0],
-  6: [Math.PI / 2, 0, Math.PI / 2],
+  2: [0, 0, 0],
+  3: [Math.PI / 2, 0, 0],
+  4: [-Math.PI / 2, 0, 0],
+  5: [0, Math.PI, 0],
+  6: [0, -Math.PI / 2, 0],
 };
 
 export const config = {
