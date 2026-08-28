@@ -38,12 +38,13 @@ function waitForServer() {
   });
 }
 
-function render(out, { theme = 'light', fill = null, view = null, face = null } = {}) {
+function render(out, { theme = 'light', fill = null, view = null, face = null, radius = 0 } = {}) {
   const params = new URLSearchParams();
   params.set('theme', theme);
   if (fill) params.set('fill', String(fill));
   if (view !== null) params.set('view', String(view));
   if (face !== null) params.set('face', String(face));
+  if (radius > 0) params.set('radius', String(radius));
   const url = `http://127.0.0.1:${port}/icon-render.html?${params}`;
   run(chrome, [
     '--headless=new',
@@ -109,17 +110,16 @@ const server = spawn(process.execPath, ['-e', serverCode], { stdio: 'ignore' });
 try {
   await waitForServer();
 
+  const radius = 0.2237;
   const masters = {
     light: { master: join(tmp, 'die-light-master.png'), maskable: join(tmp, 'die-light-maskable.png') },
     dark: { master: join(tmp, 'die-dark-master.png'), maskable: join(tmp, 'die-dark-maskable.png') },
-    tinted: { master: join(tmp, 'die-tinted-master.png'), maskable: null },
   };
 
-  render(masters.light.master, { theme: 'light' });
+  render(masters.light.master, { theme: 'light', radius });
   render(masters.light.maskable, { theme: 'light', fill: 0.78 });
-  render(masters.dark.master, { theme: 'dark' });
+  render(masters.dark.master, { theme: 'dark', radius });
   render(masters.dark.maskable, { theme: 'dark', fill: 0.78 });
-  render(masters.tinted.master, { theme: 'tinted' });
 
   if (target === 'probe') {
     const probes = [];
@@ -135,9 +135,9 @@ try {
   }
 
   if (target === 'preview') {
-    run('open', ['-a', 'Preview', masters.light.master, masters.dark.master, masters.tinted.master]);
+    run('open', ['-a', 'Preview', masters.light.master, masters.dark.master]);
     console.log(`Preview: ${masters.light.master}`);
-    console.log(`Open again: open -a Preview ${masters.light.master} ${masters.dark.master} ${masters.tinted.master}`);
+    console.log(`Open again: open -a Preview ${masters.light.master} ${masters.dark.master}`);
     process.exit(0);
   }
 
@@ -148,7 +148,6 @@ try {
     [192, 192, join(root, 'public', 'icons', 'icon-192.png')],
     [32, 32, join(root, 'public', 'icons', 'favicon-32.png')],
     [16, 16, join(root, 'public', 'icons', 'favicon-16.png')],
-    [180, 180, join(root, 'public', 'apple-touch-icon.png')],
   ];
   for (const [w, h, out] of lightOutputs) resize(w, h, masters.light.master, out);
 
@@ -157,14 +156,11 @@ try {
     [192, 192, join(root, 'public', 'icons', 'icon-dark-192.png')],
     [32, 32, join(root, 'public', 'icons', 'favicon-32-dark.png')],
     [16, 16, join(root, 'public', 'icons', 'favicon-16-dark.png')],
-    [180, 180, join(root, 'public', 'apple-touch-icon-dark.png')],
   ];
   for (const [w, h, out] of darkOutputs) resize(w, h, masters.dark.master, out);
 
   resize(512, 512, masters.light.maskable, join(root, 'public', 'icons', 'maskable-512.png'));
   resize(512, 512, masters.dark.maskable, join(root, 'public', 'icons', 'maskable-dark-512.png'));
-
-  resize(180, 180, masters.tinted.master, join(root, 'public', 'apple-touch-icon-tinted.png'));
 
   console.log('Icons generated.');
 } finally {

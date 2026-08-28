@@ -14,7 +14,6 @@ interface ThemeConfig {
   roughness: number | null;
   envIntensity: number;
   background: string | null;
-  rounded: boolean;
   flat: boolean;
   shadowOpacity: number;
   ambient: number;
@@ -28,7 +27,6 @@ const THEMES: Record<string, ThemeConfig> = {
     roughness: null,
     envIntensity: 1,
     background: 'linear-gradient(135deg, #ffffff 0%, #e9edf0 55%, #d5dbe1 100%)',
-    rounded: true,
     flat: false,
     shadowOpacity: 0.4,
     ambient: 0.6,
@@ -40,23 +38,10 @@ const THEMES: Record<string, ThemeConfig> = {
     roughness: 0.2,
     envIntensity: 2,
     background: 'linear-gradient(135deg, #34343b 0%, #1e1e24 55%, #111115 100%)',
-    rounded: true,
     flat: false,
     shadowOpacity: 0.3,
     ambient: 0.6,
     key: 2,
-  },
-  tinted: {
-    body: 0x2e2e36,
-    pips: 0xffffff,
-    roughness: 0.2,
-    envIntensity: 1,
-    background: 'linear-gradient(135deg, #34343b 0%, #1e1e24 55%, #111115 100%)',
-    rounded: true,
-    flat: false,
-    shadowOpacity: 0.3,
-    ambient: 0.7,
-    key: 1.8,
   },
 };
 
@@ -151,6 +136,7 @@ function main() {
   const themeName = params.get('theme') ?? 'light';
   const theme = THEMES[themeName] ?? THEMES.light;
   const fill = Math.min(Math.max(parseFloat(params.get('fill') ?? '1') || 1, 0.1), 1);
+  const radius = Math.min(Math.max(parseFloat(params.get('radius') ?? '0') || 0, 0), 0.5);
   const view = Math.max(0, Math.min(6, parseInt(params.get('view') ?? '6', 10) || 6));
   const face = parseInt(params.get('face') ?? '-1', 10);
 
@@ -160,8 +146,8 @@ function main() {
   if (theme.background) {
     canvas.style.background = theme.background;
   }
-  if (!theme.rounded) {
-    canvas.style.borderRadius = '0';
+  if (radius > 0) {
+    canvas.style.borderRadius = `${radius * 100}%`;
   }
   document.body.appendChild(canvas);
 

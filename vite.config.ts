@@ -22,7 +22,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['icons/*.png', 'apple-touch-icon*.png', 'models/*.glb', 'sounds/*.wav'],
+      includeAssets: ['icons/*.png', 'models/*.glb', 'sounds/*.wav'],
       manifest: {
         name: 'DiceFlow',
         short_name: 'DiceFlow',
@@ -51,6 +51,24 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
+          },
+          {
+            src: 'icons/icon-dark-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any dark',
+          },
+          {
+            src: 'icons/icon-dark-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any dark',
+          },
+          {
+            src: 'icons/maskable-dark-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable dark',
           },
         ],
       },
