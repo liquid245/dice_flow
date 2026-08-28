@@ -23,12 +23,11 @@ export function InfoPanel() {
   const changes = useMemo(() => changesSinceLastRoll(state.history), [state.history]);
   const infoPanel = config.ui.infoPanel;
 
-  const borders = config.ui.panels.borders;
-
   const contentRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const [fontSize, setFontSize] = useState(MAX_FONT);
   const [lines, setLines] = useState<string[][]>([]);
+  const [panelSize, setPanelSize] = useState<{ width: number; height: number } | null>(null);
 
   const items = useMemo(() => {
     return state.dice.length === 0
@@ -52,6 +51,20 @@ export function InfoPanel() {
     };
 
     const fit = () => {
+      const btn = document.querySelector<HTMLElement>('.action-bar button');
+      if (btn) {
+        const rect = btn.getBoundingClientRect();
+        const row = document.querySelector<HTMLElement>('.action-row');
+        let gap = 8;
+        if (row) {
+          const cs = getComputedStyle(row);
+          const cg = parseFloat(cs.columnGap);
+          const rg = parseFloat(cs.rowGap);
+          gap = Number.isFinite(cg) ? cg : Number.isFinite(rg) ? rg : 8;
+        }
+        setPanelSize({ width: Math.ceil(rect.width * 3 + gap * 2), height: Math.ceil(rect.height * 2 + gap) });
+      }
+
       const maxWidth = content.clientWidth;
       let bestSize = MIN_FONT;
       let bestLines: string[][] = [[]];
@@ -89,8 +102,8 @@ export function InfoPanel() {
     <div
       className="info-panel"
       style={{
-        justifyContent: infoPanel.centered ? 'center' : 'flex-start',
-        borderBottom: borders ? undefined : 'none',
+        width: panelSize ? `${panelSize.width}px` : undefined,
+        height: panelSize ? `${panelSize.height}px` : undefined,
       }}
     >
       <div

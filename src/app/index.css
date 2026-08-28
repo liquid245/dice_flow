@@ -33,15 +33,20 @@ body {
 .info-panel {
   display: flex;
   align-items: center;
-  min-height: calc(3 * 20px);
-  padding: 8px 16px;
-  padding-top: calc(8px + env(safe-area-inset-top, 0px));
-  padding-left: calc(16px + env(safe-area-inset-left, 0px));
-  padding-right: calc(16px + env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+  margin: 8px 16px;
+  margin-left: calc(16px + env(safe-area-inset-left, 0px));
+  margin-right: calc(16px + env(safe-area-inset-right, 0px));
+  padding: 6px clamp(4px, 1vw, 8px);
+  border-radius: 8px;
+  border: 1px solid #3a3a3a;
+  background: #2a2a2a;
+  color: #eee;
   line-height: 20px;
-  color: #bbb;
-  border-bottom: 1px solid #2a2a2a;
   overflow: hidden;
+  opacity: 0.4;
+  pointer-events: none;
+  cursor: default;
   touch-action: none;
 }
 
