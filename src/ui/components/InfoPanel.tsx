@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useGame } from '../../app/game';
 import { changesSinceLastRoll } from '../../core/history/selectors';
 import { selectedDice } from '../../core/selection/selection';
@@ -7,7 +7,7 @@ import { config } from '../../config';
 
 const MIN_FONT = 8;
 const MAX_FONT = 16;
-const DEFAULT_FONT = 14;
+const MAX_LINES = 3;
 
 function formatEntry(entry: HistoryEntry): string {
   const history = config.ui.history;
@@ -20,55 +20,98 @@ function formatEntry(entry: HistoryEntry): string {
 export function InfoPanel() {
   const { state } = useGame();
   const selected = selectedDice(state.dice, state.selection).length;
-  const changes = changesSinceLastRoll(state.history);
+  const changes = useMemo(() => changesSinceLastRoll(state.history), [state.history]);
   const infoPanel = config.ui.infoPanel;
 
   const borders = config.ui.panels.borders;
 
   const contentRef = useRef<HTMLDivElement>(null);
-  const [fontSize, setFontSize] = useState(DEFAULT_FONT);
+  const measureRef = useRef<HTMLSpanElement>(null);
+  const [fontSize, setFontSize] = useState(MAX_FONT);
+  const [lines, setLines] = useState<string[][]>([]);
+
+  const items = useMemo(() => {
+    return state.dice.length === 0
+      ? [infoPanel.swipeHint]
+      : [
+          `${state.dice.length} D6`,
+          ...changes.map((entry) => formatEntry(entry)),
+          ...(selected > 0 ? [`Selected: ${selected}`] : []),
+        ];
+  }, [state.dice.length, changes, selected, infoPanel.swipeHint]);
 
   useLayoutEffect(() => {
     const content = contentRef.current;
-    if (!content) return;
+    const measure = measureRef.current;
+    if (!content || !measure) return;
+
+    const measureWidth = (text: string, size: number): number => {
+      measure.style.fontSize = `calc(var(--font-scale) * ${size}px)`;
+      measure.textContent = text;
+      return measure.getBoundingClientRect().width;
+    };
 
     const fit = () => {
-      let size = MAX_FONT;
-      content.style.fontSize = `calc(var(--font-scale) * ${size}px)`;
-      while (size > MIN_FONT && content.scrollWidth > content.clientWidth) {
-        size -= 1;
-        content.style.fontSize = `calc(var(--font-scale) * ${size}px)`;
+      const maxWidth = content.clientWidth;
+      let bestSize = MIN_FONT;
+      let bestLines: string[][] = [[]];
+
+      for (let size = MAX_FONT; size >= MIN_FONT; size--) {
+        const laid: string[][] = [[]];
+        for (const item of items) {
+          const line = laid[laid.length - 1];
+          const candidate = line.length === 0 ? item : `${line.join(' · ')} · ${item}`;
+          if (line.length === 0 || measureWidth(candidate, size) <= maxWidth) {
+            line.push(item);
+          } else {
+            laid.push([item]);
+          }
+        }
+        bestSize = size;
+        bestLines = laid;
+        if (laid.length <= MAX_LINES) break;
       }
-      setFontSize(size);
+
+      if (bestLines.length > MAX_LINES) {
+        bestLines = bestLines.slice(-MAX_LINES);
+      }
+      setFontSize(bestSize);
+      setLines(bestLines);
     };
 
     fit();
     const observer = new ResizeObserver(fit);
     observer.observe(content);
     return () => observer.disconnect();
-  }, [state.dice.length, state.history, selected]);
+  }, [items]);
 
   return (
     <div
       className="info-panel"
-      style={{ textAlign: infoPanel.centered ? 'center' : 'left', borderBottom: borders ? undefined : 'none' }}
+      style={{
+        justifyContent: infoPanel.centered ? 'center' : 'flex-start',
+        borderBottom: borders ? undefined : 'none',
+      }}
     >
       <div
         ref={contentRef}
         className="info-panel-content"
-        style={{ fontSize: `calc(var(--font-scale) * ${fontSize}px)` }}
+        style={{
+          fontSize: `calc(var(--font-scale) * ${fontSize}px)`,
+          alignItems: infoPanel.centered ? 'center' : 'flex-start',
+        }}
       >
-        {state.dice.length === 0 ? (
-          <span>{infoPanel.swipeHint}</span>
-        ) : (
-          <>
-            <span>{state.dice.length} D6</span>
-            {changes.map((entry) => (
-              <span key={entry.id}> · {formatEntry(entry)}</span>
+        {lines.map((line, i) => (
+          <div key={i} className="history-line">
+            {line.map((item, j) => (
+              <span key={j}>
+                {j > 0 && <span className="dot"> · </span>}
+                {item}
+              </span>
             ))}
-            {selected > 0 && <span> · Selected: {selected}</span>}
-          </>
-        )}
+          </div>
+        ))}
+        <span ref={measureRef} className="measure" aria-hidden="true" />
       </div>
     </div>
   );

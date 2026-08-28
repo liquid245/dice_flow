@@ -31,6 +31,9 @@ body {
 }
 
 .info-panel {
+  display: flex;
+  align-items: center;
+  min-height: calc(3 * 20px);
   padding: 8px 16px;
   padding-top: calc(8px + env(safe-area-inset-top, 0px));
   padding-left: calc(16px + env(safe-area-inset-left, 0px));
@@ -43,9 +46,32 @@ body {
 }
 
 .info-panel-content {
-  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
   overflow: hidden;
-  text-overflow: clip;
+}
+
+.history-line {
+  display: flex;
+}
+
+.history-line span {
+  white-space: nowrap;
+}
+
+.history-line .dot {
+  flex-shrink: 0;
+}
+
+.measure {
+  position: absolute;
+  left: -9999px;
+  visibility: hidden;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .table {
