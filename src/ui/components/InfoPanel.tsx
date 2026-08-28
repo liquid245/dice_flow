@@ -23,11 +23,11 @@ export function InfoPanel() {
   const changes = useMemo(() => changesSinceLastRoll(state.history), [state.history]);
   const infoPanel = config.ui.infoPanel;
 
+  const rootRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const [fontSize, setFontSize] = useState(MAX_FONT);
   const [lines, setLines] = useState<string[][]>([]);
-  const [panelSize, setPanelSize] = useState<{ width: number; height: number } | null>(null);
 
   const items = useMemo(() => {
     return state.dice.length === 0
@@ -40,9 +40,10 @@ export function InfoPanel() {
   }, [state.dice.length, changes, selected, infoPanel.swipeHint]);
 
   useLayoutEffect(() => {
+    const root = rootRef.current;
     const content = contentRef.current;
     const measure = measureRef.current;
-    if (!content || !measure) return;
+    if (!root || !content || !measure) return;
 
     const measureWidth = (text: string, size: number): number => {
       measure.style.fontSize = `calc(var(--font-scale) * ${size}px)`;
@@ -50,20 +51,24 @@ export function InfoPanel() {
       return measure.getBoundingClientRect().width;
     };
 
-    const fit = () => {
+    const applySize = () => {
       const btn = document.querySelector<HTMLElement>('.action-bar button');
-      if (btn) {
-        const rect = btn.getBoundingClientRect();
-        const row = document.querySelector<HTMLElement>('.action-row');
-        let gap = 8;
-        if (row) {
-          const cs = getComputedStyle(row);
-          const cg = parseFloat(cs.columnGap);
-          const rg = parseFloat(cs.rowGap);
-          gap = Number.isFinite(cg) ? cg : Number.isFinite(rg) ? rg : 8;
-        }
-        setPanelSize({ width: Math.ceil(rect.width * 3 + gap * 2), height: Math.ceil(rect.height * 2 + gap) });
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      const row = document.querySelector<HTMLElement>('.action-row');
+      let gap = 8;
+      if (row) {
+        const cs = getComputedStyle(row);
+        const cg = parseFloat(cs.columnGap);
+        const rg = parseFloat(cs.rowGap);
+        gap = Number.isFinite(cg) ? cg : Number.isFinite(rg) ? rg : 8;
       }
+      root.style.width = `${Math.ceil(rect.width * 3 + gap * 2)}px`;
+      root.style.height = `${Math.ceil(rect.height * 2 + gap)}px`;
+    };
+
+    const fit = () => {
+      applySize();
 
       const maxWidth = content.clientWidth;
       let bestSize = MIN_FONT;
@@ -88,24 +93,24 @@ export function InfoPanel() {
       if (bestLines.length > MAX_LINES) {
         bestLines = bestLines.slice(-MAX_LINES);
       }
-      setFontSize(bestSize);
-      setLines(bestLines);
+
+      setFontSize((prev) => (prev === bestSize ? prev : bestSize));
+      setLines((prev) => {
+        if (prev.length === bestLines.length && prev.every((line, i) => line.join('\u0000') === bestLines[i].join('\u0000'))) {
+          return prev;
+        }
+        return bestLines;
+      });
     };
 
     fit();
     const observer = new ResizeObserver(fit);
-    observer.observe(content);
+    observer.observe(root);
     return () => observer.disconnect();
   }, [items]);
 
   return (
-    <div
-      className="info-panel"
-      style={{
-        width: panelSize ? `${panelSize.width}px` : undefined,
-        height: panelSize ? `${panelSize.height}px` : undefined,
-      }}
-    >
+    <div ref={rootRef} className="info-panel">
       <div
         ref={contentRef}
         className="info-panel-content"
