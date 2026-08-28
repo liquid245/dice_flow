@@ -4,11 +4,16 @@ const base = import.meta.env.BASE_URL || '/';
 
 export type ButtonKey = 'roll' | 'reroll' | 'add' | 'delete' | 'undo' | 'redo' | 'clear';
 
-const buttons: Record<ButtonKey, string> = {
+type ButtonLabel = ButtonKey | 'rerollAll' | 'addOne' | 'deleteLast';
+
+const buttons: Record<ButtonLabel, string> = {
   roll: 'Roll',
   reroll: 'Reroll',
+  rerollAll: 'Reroll All',
   add: 'Add',
+  addOne: 'Add One',
   delete: 'Delete',
+  deleteLast: 'Delete Last',
   undo: 'Undo',
   redo: 'Redo',
   clear: 'Clear',

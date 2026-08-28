@@ -15,17 +15,17 @@ export function ActionBar() {
       <div className="action-row">
         {isOn('delete') && (
           <button disabled={!hasDice} onClick={() => dispatch({ type: 'delete' })}>
-            {selectedCount > 0 ? `${config.buttons.delete} ${selectedCount}` : config.buttons.delete}
+            {selectedCount > 0 ? `${config.buttons.delete} ${selectedCount}` : config.buttons.deleteLast}
           </button>
         )}
         {isOn('add') && (
           <button onClick={() => dispatch({ type: 'add', count: selectedCount || 1 })}>
-            {config.buttons.add} {selectedCount || 1}
+            {selectedCount > 0 ? `${config.buttons.add} ${selectedCount}` : config.buttons.addOne}
           </button>
         )}
         {isOn('reroll') && (
           <button disabled={!hasDice} onClick={() => dispatch({ type: 'reroll' })}>
-            {config.buttons.reroll}
+            {selectedCount > 0 ? config.buttons.reroll : config.buttons.rerollAll}
           </button>
         )}
       </div>
