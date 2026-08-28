@@ -99,7 +99,7 @@ run(rolldown, ['--config', join(tmp, 'rolldown.config.mjs')]);
 writeFileSync(
   join(tmp, 'icon-render.html'),
   '<!doctype html><html><head><meta charset="utf-8">' +
-    '<style>html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden}canvas{display:block;border-radius:22.37%}</style>' +
+    '<style>html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden}canvas{display:block}</style>' +
     '</head><body><script src="./icon-render.bundle.js"></script></body></html>',
 );
 
