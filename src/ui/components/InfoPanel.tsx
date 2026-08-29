@@ -26,6 +26,8 @@ export function InfoPanel() {
   const rootRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
+  const lockedMaxFontRef = useRef<number | null>(null);
+  const prevCoreCountRef = useRef<number | null>(null);
   const [fontSize, setFontSize] = useState(MAX_FONT);
   const [lines, setLines] = useState<string[][]>([]);
 
@@ -70,11 +72,20 @@ export function InfoPanel() {
     const fit = () => {
       applySize();
 
+      const coreCount = items.length - (selected > 0 ? 1 : 0);
+      const prevCore = prevCoreCountRef.current;
+      if (prevCore !== null && coreCount < prevCore) {
+        lockedMaxFontRef.current = null;
+      }
+      prevCoreCountRef.current = coreCount;
+
       const maxWidth = content.clientWidth;
+      const effectiveMax =
+        lockedMaxFontRef.current !== null ? Math.min(MAX_FONT, lockedMaxFontRef.current) : MAX_FONT;
       let bestSize = MIN_FONT;
       let bestLines: string[][] = [[]];
 
-      for (let size = MAX_FONT; size >= MIN_FONT; size--) {
+      for (let size = effectiveMax; size >= MIN_FONT; size--) {
         const laid: string[][] = [[]];
         for (const item of items) {
           const line = laid[laid.length - 1];
@@ -94,6 +105,9 @@ export function InfoPanel() {
         bestLines = bestLines.slice(-MAX_LINES);
       }
 
+      lockedMaxFontRef.current =
+        lockedMaxFontRef.current === null ? bestSize : Math.min(lockedMaxFontRef.current, bestSize);
+
       setFontSize((prev) => (prev === bestSize ? prev : bestSize));
       setLines((prev) => {
         if (prev.length === bestLines.length && prev.every((line, i) => line.join('\u0000') === bestLines[i].join('\u0000'))) {
@@ -107,7 +121,7 @@ export function InfoPanel() {
     const observer = new ResizeObserver(fit);
     observer.observe(root);
     return () => observer.disconnect();
-  }, [items]);
+  }, [items, selected]);
 
   return (
     <div ref={rootRef} className="info-panel">
