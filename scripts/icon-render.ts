@@ -268,6 +268,32 @@ function paintPipGradient(data: ImageData, topGray: number, bottomGray: number):
   }
 }
 
+function fillBackgroundGradient(data: ImageData, bg: string): void {
+  if (bg === 'none') return;
+  const stops =
+    bg === 'white'
+      ? [
+          [251, 251, 253],
+          [223, 228, 233],
+        ]
+      : [
+          [233, 236, 240],
+          [154, 162, 172],
+        ];
+  const w = data.width;
+  const h = data.height;
+  for (let i = 0; i < w * h; i++) {
+    if (data.data[i * 4 + 3] >= 8) continue;
+    const y = (i / w) | 0;
+    const t = h > 1 ? y / (h - 1) : 0;
+    const j = i * 4;
+    for (let c = 0; c < 3; c++) {
+      data.data[j + c] = Math.round(stops[0][c] + (stops[1][c] - stops[0][c]) * t);
+    }
+    data.data[j + 3] = 255;
+  }
+}
+
 function composeAlphaBody(
   passA: ImageData,
   passB: ImageData,
@@ -275,6 +301,7 @@ function composeAlphaBody(
   ring: number,
   gradTop: number,
   gradBottom: number,
+  bg: string,
 ): HTMLCanvasElement | null {
   const n = passA.width * passA.height;
   const out = new ImageData(passA.width, passA.height);
@@ -301,6 +328,7 @@ function composeAlphaBody(
   dropSmallComponents(out, 0.45);
   paintPipGradient(out, gradTop, gradBottom);
   addWhiteRing(out, ring);
+  fillBackgroundGradient(out, bg);
   return canvasFromImageData(out);
 }
 
@@ -315,6 +343,7 @@ function renderGlyphCut(
   ring: number,
   gradTop: number,
   gradBottom: number,
+  bg: string,
 ): void {
   renderer.render(scene, camera);
   const passA = snapshotCanvas(canvas);
@@ -343,7 +372,7 @@ function renderGlyphCut(
 
   if (!passB) return;
 
-  const composed = composeAlphaBody(passA, passB, amount, ring, gradTop, gradBottom);
+  const composed = composeAlphaBody(passA, passB, amount, ring, gradTop, gradBottom, bg);
   if (!composed) return;
   canvas.remove();
   document.body.appendChild(composed);
@@ -366,6 +395,7 @@ function main() {
   };
   const gradTop = readGray('gradtop', 235);
   const gradBottom = readGray('gradbot', 60);
+  const bg = params.get('bg') ?? 'none';
 
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
@@ -459,7 +489,7 @@ function main() {
 
       renderer.render(scene, camera);
       if (themeName === 'glyph') {
-        renderGlyphCut(canvas, renderer, scene, camera, group, groups, cut, ring, gradTop, gradBottom);
+        renderGlyphCut(canvas, renderer, scene, camera, group, groups, cut, ring, gradTop, gradBottom, bg);
       }
       (window as unknown as { __iconDone?: boolean }).__iconDone = true;
     },
