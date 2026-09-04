@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Die } from '../core/dice/types';
 import type { HistoryEntry, HistoryKind } from '../core/history/types';
 import type { Selection } from '../core/selection/selection';
-import { currentIteration, describeSelection, formatAction, formatSelectionText } from './feed';
+import { buildHistoryFeed, describeSelection, formatAction, formatSelectionText } from './feed';
 
 function entry(kind: HistoryKind, count = 0, value?: number): HistoryEntry {
   return { id: `${kind}-${Math.random()}`, timestamp: 0, kind, count, value };
@@ -99,19 +99,66 @@ describe('formatAction', () => {
   });
 });
 
-describe('currentIteration', () => {
-  it('slices from the last roll', () => {
-    const history = [entry('add', 5), entry('roll', 5), entry('reroll', 2), entry('add', 1)];
-    expect(currentIteration(history).map((e) => e.kind)).toEqual(['roll', 'reroll', 'add']);
+describe('buildHistoryFeed', () => {
+  function roll(count: number, values: number[]): HistoryEntry {
+    return { ...entry('roll', count), after: values };
+  }
+
+  it('shows the swipe hint when there are no dice', () => {
+    const feed = buildHistoryFeed([], [roll(5, [6, 6, 5, 5, 5])], 'Swipe to add');
+    expect(feed.system).toBe('Swipe to add');
+    expect(feed.summary).toBe('');
+    expect(feed.rows).toEqual([]);
+    expect(feed.active).toBe(false);
   });
 
-  it('slices from the last clear', () => {
-    const history = [entry('roll', 5), entry('clear', 5), entry('add', 10)];
-    expect(currentIteration(history).map((e) => e.kind)).toEqual(['clear', 'add']);
+  it('shows the dice count when dice exist but the chunk is empty', () => {
+    const feed = buildHistoryFeed([die('a', 6), die('b', 5), die('c', 4)], [], 'Swipe to add');
+    expect(feed.system).toBeNull();
+    expect(feed.summary).toBe('3 dice');
+    expect(feed.rows).toEqual([]);
+    expect(feed.active).toBe(false);
   });
 
-  it('returns the whole history before any roll or clear', () => {
-    const history = [entry('add', 10), entry('add', 5)];
-    expect(currentIteration(history).map((e) => e.kind)).toEqual(['add', 'add']);
+  it('builds a single summary from the last roll', () => {
+    const history = [roll(5, [6, 6, 5, 5, 5]), { ...entry('add', 1), count: 1 } as HistoryEntry];
+    const dice = [die('a', 6), die('b', 6), die('c', 5), die('d', 5), die('e', 5), die('f', 6)];
+    const feed = buildHistoryFeed(dice, history, 'Swipe to add');
+    expect(feed.system).toBeNull();
+    expect(feed.summary).toBe('Roll 5 → 6×2, 5×3 · 6 dice');
+    expect(feed.rows).toEqual(['Roll 5 → 6×2, 5×3', 'Add 1']);
+    expect(feed.active).toBe(true);
+  });
+
+  it('keeps the last roll on view after later add/move entries', () => {
+    const history = [roll(5, [6, 6, 5, 5, 5]), { ...entry('add', 1) } as HistoryEntry];
+    const dice = [die('a', 6), die('b', 6), die('c', 5), die('d', 5), die('e', 5), die('f', 4)];
+    const feed = buildHistoryFeed(dice, history, 'Swipe to add');
+    expect(feed.summary).toBe('Roll 5 → 6×2, 5×3 · 6 dice');
+  });
+
+  it('is inactive with a single entry', () => {
+    const history = [roll(3, [6, 5, 4])];
+    const dice = [die('a', 6), die('b', 5), die('c', 4)];
+    const feed = buildHistoryFeed(dice, history, 'Swipe to add');
+    expect(feed.active).toBe(false);
+    expect(feed.summary).toBe('Roll 3 → 6, 5, 4 · 3 dice');
+    expect(feed.rows).toEqual(['Roll 3 → 6, 5, 4']);
+  });
+
+  it('falls back to the latest entry when no roll exists yet', () => {
+    const history = [{ ...entry('add', 3) } as HistoryEntry];
+    const dice = [die('a', 1), die('b', 2), die('c', 3)];
+    const feed = buildHistoryFeed(dice, history, 'Swipe to add');
+    expect(feed.summary).toBe('Add 3 · 3 dice');
+    expect(feed.active).toBe(false);
+  });
+
+  it('slices history by clear and hides the clear marker', () => {
+    const history = [roll(5, [6, 5, 5, 4, 3]), { ...entry('clear', 5) } as HistoryEntry, roll(2, [6, 1])];
+    const dice = [die('a', 6), die('b', 1)];
+    const feed = buildHistoryFeed(dice, history, 'Swipe to add');
+    expect(feed.rows).toEqual(['Roll 2 → 6, 1']);
+    expect(feed.active).toBe(false);
   });
 });

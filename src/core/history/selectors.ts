@@ -1,13 +1,8 @@
 import type { HistoryEntry } from './types';
 
-export function changesSinceLastRoll(history: HistoryEntry[]): HistoryEntry[] {
-  let start = 0;
+export function currentChunk(history: HistoryEntry[]): HistoryEntry[] {
   for (let i = history.length - 1; i >= 0; i--) {
-    const kind = history[i].kind;
-    if (kind === 'roll' || kind === 'clear') {
-      start = i + 1;
-      break;
-    }
+    if (history[i].kind === 'clear') return history.slice(i + 1);
   }
-  return history.slice(start);
+  return history.slice();
 }

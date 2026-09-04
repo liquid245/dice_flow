@@ -1,18 +1,11 @@
 import { config } from '../config';
 import type { Die } from '../core/dice/types';
 import type { HistoryEntry } from '../core/history/types';
+import { currentChunk } from '../core/history/selectors';
 import type { Selection } from '../core/selection/selection';
 import { isDieSelected } from '../core/selection/selection';
 
 const uiHistory = config.ui.history;
-
-export function currentIteration(history: HistoryEntry[]): HistoryEntry[] {
-  for (let i = history.length - 1; i >= 0; i--) {
-    const kind = history[i].kind;
-    if (kind === 'roll' || kind === 'clear') return history.slice(i);
-  }
-  return history.slice();
-}
 
 function valueTextFor(values: number[]): string {
   const unique = Array.from(new Set(values)).sort((a, b) => a - b);
@@ -84,4 +77,35 @@ export function formatAction(entry: HistoryEntry): string {
     default:
       return entry.count > 0 ? `${verb} ${entry.count}` : verb;
   }
+}
+
+function lastRollRerollIndex(chunk: HistoryEntry[]): number {
+  for (let i = chunk.length - 1; i >= 0; i--) {
+    if (chunk[i].kind === 'roll' || chunk[i].kind === 'reroll') return i;
+  }
+  return -1;
+}
+
+export interface HistoryFeed {
+  chunk: HistoryEntry[];
+  system: string | null;
+  summary: string;
+  rows: string[];
+  active: boolean;
+}
+
+export function buildHistoryFeed(dice: Die[], history: HistoryEntry[], swipeHint: string): HistoryFeed {
+  const chunk = currentChunk(history);
+  if (dice.length === 0) {
+    return { chunk, system: swipeHint, summary: '', rows: [], active: false };
+  }
+  const rows = chunk.map((entry) => formatAction(entry));
+  const total = `${dice.length} ${uiHistory.diceWord}`;
+  if (rows.length === 0) {
+    return { chunk, system: null, summary: total, rows, active: false };
+  }
+  const rollIndex = lastRollRerollIndex(chunk);
+  const index = rollIndex >= 0 ? rollIndex : chunk.length - 1;
+  const summary = `${rows[index]}${uiHistory.segmentSep}${total}`;
+  return { chunk, system: null, summary, rows, active: chunk.length > 1 };
 }

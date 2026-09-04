@@ -1,52 +1,35 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useGame } from '../../app/game';
 import { config } from '../../config';
-import { currentIteration, describeSelection, formatAction, formatSelectionText } from '../feed';
+import { buildHistoryFeed } from '../feed';
 
-const MIN_FONT = 8;
+const MIN_FONT = 6;
 const MAX_FONT = 16;
-const MAX_ROWS = 3;
-
-interface View {
-  rows: string[];
-  centered: boolean;
-}
 
 export function InfoPanel() {
   const { state } = useGame();
   const infoPanel = config.ui.infoPanel;
-  const uiHistory = config.ui.history;
+
+  const feed = useMemo(
+    () => buildHistoryFeed(state.dice, state.history, infoPanel.swipeHint),
+    [state.dice, state.history, infoPanel.swipeHint],
+  );
+
+  const chunkKey = useMemo(() => feed.chunk.map((entry) => entry.id).join('\n'), [feed.chunk]);
+  const [expanded, setExpanded] = useState(false);
+  const [fontSize, setFontSize] = useState(MAX_FONT);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
-  const [fontSize, setFontSize] = useState(MAX_FONT);
-  const [view, setView] = useState<View>({ rows: [''], centered: false });
 
-  const content = useMemo<View>(() => {
-    if (state.dice.length === 0) {
-      return { rows: [infoPanel.swipeHint], centered: true };
-    }
-    const entries = currentIteration(state.history);
-    const lastEntries = entries.length > MAX_ROWS ? entries.slice(entries.length - MAX_ROWS) : entries;
-    const rows = lastEntries.map((entry) => formatAction(entry));
-    const totalText = `${state.dice.length} ${uiHistory.diceWord}`;
-    if (rows.length === 0) {
-      const selection = describeSelection(state.dice, state.selection);
-      const selectionText = selection ? formatSelectionText(selection) : null;
-      return {
-        rows: [selectionText ? `${totalText}${uiHistory.segmentSep}${selectionText}` : totalText],
-        centered: false,
-      };
-    }
-    const selection = describeSelection(state.dice, state.selection);
-    const selectionText = selection ? formatSelectionText(selection) : null;
-    const lastText = formatAction(entries[entries.length - 1]);
-    rows[rows.length - 1] = [lastText, totalText, selectionText]
-      .filter((part): part is string => part !== null)
-      .join(uiHistory.segmentSep);
-    return { rows, centered: false };
-  }, [state.dice, state.history, state.selection, infoPanel.swipeHint, uiHistory]);
+  const [prevChunkKey, setPrevChunkKey] = useState(chunkKey);
+  if (prevChunkKey !== chunkKey) {
+    setPrevChunkKey(chunkKey);
+    setExpanded(false);
+  }
+
+  const collapsedText = feed.system ?? feed.summary;
 
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -73,49 +56,67 @@ export function InfoPanel() {
         gap = Number.isFinite(cg) ? cg : Number.isFinite(rg) ? rg : 8;
       }
       root.style.width = `${Math.ceil(rect.width * 3 + gap * 2)}px`;
-      root.style.height = `${Math.ceil(rect.height * 2 + gap)}px`;
     };
 
     const fit = () => {
       applySize();
 
+      if (expanded || feed.system) {
+        setFontSize((prev) => (prev === MAX_FONT ? prev : MAX_FONT));
+        return;
+      }
+
       const maxWidth = contentBox.clientWidth;
       let bestSize = MIN_FONT;
       for (let size = MAX_FONT; size >= MIN_FONT; size--) {
-        if (content.rows.every((row) => measureWidth(row, size) <= maxWidth)) {
+        if (measureWidth(feed.summary, size) <= maxWidth) {
           bestSize = size;
           break;
         }
       }
-
       setFontSize((prev) => (prev === bestSize ? prev : bestSize));
-      setView((prev) => {
-        if (prev.centered === content.centered && prev.rows.length === content.rows.length) {
-          const same = prev.rows.every((row, i) => row === content.rows[i]);
-          if (same) return prev;
-        }
-        return content;
-      });
     };
 
     fit();
     const observer = new ResizeObserver(fit);
     observer.observe(root);
     return () => observer.disconnect();
-  }, [content]);
+  }, [feed.summary, feed.system, expanded]);
+
+  const modifiers = [
+    feed.active ? 'info-panel--active' : '',
+    expanded ? 'info-panel--expanded' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <div ref={rootRef} className="info-panel">
+    <div
+      ref={rootRef}
+      className={`info-panel ${modifiers}`}
+      aria-expanded={expanded}
+      onClick={() => {
+        if (feed.active) setExpanded((value) => !value);
+      }}
+    >
       <div
         ref={contentRef}
         className="info-panel-content"
         style={{ fontSize: `calc(var(--font-scale) * ${fontSize}px)` }}
       >
-        {view.rows.map((row, i) => (
-          <div key={i} className={view.centered ? 'history-line history-line--center' : 'history-line'}>
-            {row}
+        {expanded ? (
+          feed.rows.map((row, i) => (
+            <div key={i} className="history-line history-line--expand">
+              {row}
+            </div>
+          ))
+        ) : (
+          <div
+            className={`history-line history-line--center${feed.system ? ' history-line--wrap' : ''}`}
+          >
+            {collapsedText}
           </div>
-        ))}
+        )}
         <span ref={measureRef} className="measure" aria-hidden="true" />
       </div>
     </div>
