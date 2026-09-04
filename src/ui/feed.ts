@@ -27,9 +27,26 @@ export interface SelectedSummary {
 }
 
 export function describeSelection(dice: Die[], selection: Selection): SelectedSummary | null {
-  const selectedValues = dice.filter((d) => isDieSelected(d, selection)).map((d) => d.value);
-  if (selectedValues.length === 0) return null;
-  return { count: selectedValues.length, valueText: valueTextFor(selectedValues) };
+  const selectedDice = dice.filter((d) => isDieSelected(d, selection));
+  if (selectedDice.length === 0) return null;
+
+  const totalByValue = new Map<number, number>();
+  const selectedByValue = new Map<number, number>();
+  for (const d of dice) totalByValue.set(d.value, (totalByValue.get(d.value) ?? 0) + 1);
+  for (const d of selectedDice) selectedByValue.set(d.value, (selectedByValue.get(d.value) ?? 0) + 1);
+
+  const partial = Array.from(selectedByValue.keys()).some(
+    (value) => (selectedByValue.get(value) ?? 0) < (totalByValue.get(value) ?? 0),
+  );
+  if (!partial) {
+    return { count: selectedDice.length, valueText: valueTextFor(selectedDice.map((d) => d.value)) };
+  }
+
+  const values = selectedDice.map((d) => d.value).sort((a, b) => a - b);
+  const lo = values[0];
+  const hi = values[values.length - 1];
+  const range = lo === hi ? `${lo}` : `${lo}-${hi}`;
+  return { count: selectedDice.length, valueText: `${uiHistory.someWord} ${range}` };
 }
 
 export function formatSelectionText(summary: SelectedSummary): string {

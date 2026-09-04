@@ -121,6 +121,7 @@ export const config = {
       pluralSuffix: 's',
       totalWord: 'Total',
       selectWord: 'Selected',
+      someWord: 'Some of',
       listSep: ', ',
       segmentSep: ' · ',
     },

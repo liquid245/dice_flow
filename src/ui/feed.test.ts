@@ -34,9 +34,31 @@ describe('describeSelection', () => {
     expect(summary).toEqual({ count: 3, valueText: '4+' });
   });
 
-  it('renders only sixes as 6+', () => {
+  it('renders a fully selected six group as 6+', () => {
     const dice = [die('a', 6), die('b', 6), die('c', 6)];
-    expect(describeSelection(dice, idsSelection(['a', 'b']))).toEqual({ count: 2, valueText: '6+' });
+    expect(describeSelection(dice, idsSelection(['a', 'b', 'c']))).toEqual({ count: 3, valueText: '6+' });
+  });
+
+  it('renders a partially selected single group as Some of value', () => {
+    const dice = [die('a', 6), die('b', 6), die('c', 6)];
+    const summary = describeSelection(dice, idsSelection(['a', 'b']));
+    expect(summary).toEqual({ count: 2, valueText: 'Some of 6' });
+    expect(formatSelectionText(summary as NonNullable<typeof summary>)).toBe('Selected 2 (Some of 6)');
+  });
+
+  it('renders a partially selected value window without X+ notation', () => {
+    const dice = [die('a', 6), die('b', 6), die('c', 6), die('d', 5), die('e', 5), die('f', 4), die('g', 4)];
+    const summary = describeSelection(dice, idsSelection(['a', 'b', 'd', 'e', 'f']));
+    expect(summary).toEqual({ count: 5, valueText: 'Some of 4-6' });
+    expect(formatSelectionText(summary as NonNullable<typeof summary>)).toBe('Selected 5 (Some of 4-6)');
+  });
+
+  it('renders a partially selected non-six window as Some of lo-hi', () => {
+    const dice = [die('a', 3), die('b', 3), die('c', 2), die('d', 1)];
+    expect(describeSelection(dice, idsSelection(['a', 'c', 'd']))).toEqual({
+      count: 3,
+      valueText: 'Some of 1-3',
+    });
   });
 
   it('pluralizes a single non-six value', () => {
