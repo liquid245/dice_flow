@@ -101,6 +101,11 @@ body {
   white-space: normal;
   overflow-wrap: anywhere;
   text-overflow: clip;
+  opacity: 0.4;
+}
+
+.history-line--live {
+  opacity: 1;
 }
 
 .measure {

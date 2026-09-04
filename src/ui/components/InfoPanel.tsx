@@ -6,6 +6,7 @@ import { buildHistoryFeed } from '../feed';
 const MIN_FONT = 6;
 const MAX_FONT = 16;
 const LINE_HEIGHT = 20;
+const LINE_FACTOR = LINE_HEIGHT / MAX_FONT;
 
 function historyRowLimit(): number {
   const landscape = window.matchMedia('(orientation: landscape)').matches;
@@ -47,6 +48,8 @@ export function InfoPanel() {
 
     let singleRow = false;
     let buttonFont = MAX_FONT;
+    let collapsedH = 0;
+    let vInset = 0;
 
     const applySize = () => {
       const bar = document.querySelector<HTMLElement>('.action-bar');
@@ -68,14 +71,20 @@ export function InfoPanel() {
         gap = Number.isFinite(cg) ? cg : Number.isFinite(rg) ? rg : 8;
       }
       root.style.width = singleRow ? '' : `${Math.ceil(rect.width * 3 + gap * 2)}px`;
-      const collapsedHeight = singleRow ? Math.ceil(rect.height) : Math.ceil(rect.height * 2 + gap);
+      collapsedH = singleRow ? Math.ceil(rect.height) : Math.ceil(rect.height * 2 + gap);
+      const rootStyle = getComputedStyle(root);
+      vInset =
+        (parseFloat(rootStyle.paddingTop) || 0) +
+        (parseFloat(rootStyle.paddingBottom) || 0) +
+        (parseFloat(rootStyle.borderTopWidth) || 0) +
+        (parseFloat(rootStyle.borderBottomWidth) || 0);
       if (expanded) {
         contentBox.style.lineHeight = '';
         root.style.height = '';
         contentBox.style.height = `${historyRowLimit() * LINE_HEIGHT}px`;
       } else {
         contentBox.style.lineHeight = singleRow ? 'normal' : '';
-        root.style.height = `${collapsedHeight}px`;
+        root.style.height = `${collapsedH}px`;
         root.style.setProperty('--panel-band', '0px');
       }
     };
@@ -87,19 +96,25 @@ export function InfoPanel() {
         setFontSize((prev) => (prev === MAX_FONT ? prev : MAX_FONT));
         return;
       }
-      const maxFont = singleRow ? buttonFont : MAX_FONT;
       if (feed.system) {
-        setFontSize((prev) => (prev === maxFont ? prev : maxFont));
+        const font = singleRow ? buttonFont : MAX_FONT;
+        setFontSize((prev) => (prev === font ? prev : font));
         return;
       }
 
       const maxWidth = contentBox.clientWidth;
+      const heightCap = Math.floor((collapsedH - vInset) / LINE_FACTOR);
+      const maxFont = singleRow ? buttonFont : Math.max(MAX_FONT, heightCap);
+
       let bestSize = MIN_FONT;
       for (let size = maxFont; size >= MIN_FONT; size--) {
         if (measureWidth(feed.summary, size) <= maxWidth) {
           bestSize = size;
           break;
         }
+      }
+      if (!singleRow) {
+        contentBox.style.lineHeight = `${Math.round(bestSize * LINE_FACTOR)}px`;
       }
       setFontSize((prev) => (prev === bestSize ? prev : bestSize));
     };
