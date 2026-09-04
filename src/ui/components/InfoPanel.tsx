@@ -7,6 +7,7 @@ const MIN_FONT = 6;
 const MAX_FONT = 16;
 const LINE_HEIGHT = 20;
 const LINE_FACTOR = LINE_HEIGHT / MAX_FONT;
+const FIT_LIMIT = 2 / 3;
 
 function historyRowLimit(): number {
   const landscape = window.matchMedia('(orientation: landscape)').matches;
@@ -103,7 +104,7 @@ export function InfoPanel() {
       }
 
       const maxWidth = contentBox.clientWidth;
-      const heightCap = Math.floor((collapsedH - vInset) / LINE_FACTOR);
+      const heightCap = Math.floor(((collapsedH - vInset) / LINE_FACTOR) * FIT_LIMIT);
       const maxFont = singleRow ? buttonFont : Math.max(MAX_FONT, heightCap);
 
       let bestSize = MIN_FONT;
