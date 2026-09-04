@@ -204,7 +204,56 @@ function dropSmallComponents(data: ImageData, keepFrac: number): void {
   }
 }
 
-function composeAlphaBody(passA: ImageData, passB: ImageData, amount: number): HTMLCanvasElement | null {
+function addWhiteRing(data: ImageData, thickness: number): void {
+  const w = data.width;
+  const h = data.height;
+  const n = w * h;
+  const dist = new Uint8Array(n).fill(255);
+  const visited = new Uint8Array(n);
+  const queue = new Int32Array(n);
+  let head = 0;
+  let tail = 0;
+  for (let i = 0; i < n; i++) {
+    if (data.data[i * 4 + 3] >= 128) {
+      dist[i] = 0;
+      visited[i] = 1;
+      queue[tail++] = i;
+    }
+  }
+  const limit = thickness + 1;
+  const nb = [-1, 1, -w, w, -w - 1, -w + 1, w - 1, w + 1];
+  while (head < tail) {
+    const p = queue[head++];
+    const d = dist[p];
+    if (d >= limit) continue;
+    const py = (p / w) | 0;
+    const px = p - py * w;
+    for (let k = 0; k < 8; k++) {
+      const q = p + nb[k];
+      if (q < 0 || q >= n) continue;
+      const qy = (q / w) | 0;
+      const qx = q - qy * w;
+      if (Math.abs(qx - px) > 1 || Math.abs(qy - py) > 1) continue;
+      if (visited[q]) continue;
+      const nd = d + 1;
+      if (nd > limit) continue;
+      dist[q] = nd;
+      visited[q] = 1;
+      queue[tail++] = q;
+    }
+  }
+  for (let i = 0; i < n; i++) {
+    const d = dist[i];
+    if (d === 0 || d > limit) continue;
+    const alpha = d <= thickness ? 255 : 110;
+    data.data[i * 4] = 255;
+    data.data[i * 4 + 1] = 255;
+    data.data[i * 4 + 2] = 255;
+    data.data[i * 4 + 3] = alpha;
+  }
+}
+
+function composeAlphaBody(passA: ImageData, passB: ImageData, amount: number, ring: number): HTMLCanvasElement | null {
   const n = passA.width * passA.height;
   const out = new ImageData(passA.width, passA.height);
   const a = passA.data;
@@ -228,6 +277,7 @@ function composeAlphaBody(passA: ImageData, passB: ImageData, amount: number): H
     o[j + 3] = Math.max(0, Math.min(255, alpha));
   }
   dropSmallComponents(out, 0.45);
+  addWhiteRing(out, ring);
   return canvasFromImageData(out);
 }
 
@@ -239,6 +289,7 @@ function renderGlyphCut(
   group: THREE.Group,
   groups: LodGroup[],
   amount: number,
+  ring: number,
 ): void {
   renderer.render(scene, camera);
   const passA = snapshotCanvas(canvas);
@@ -267,7 +318,7 @@ function renderGlyphCut(
 
   if (!passB) return;
 
-  const composed = composeAlphaBody(passA, passB, amount);
+  const composed = composeAlphaBody(passA, passB, amount, ring);
   if (!composed) return;
   canvas.remove();
   document.body.appendChild(composed);
@@ -282,6 +333,8 @@ function main() {
   const view = Math.max(0, Math.min(6, parseInt(params.get('view') ?? '6', 10) || 6));
   const face = parseInt(params.get('face') ?? '-1', 10);
   const cut = Math.min(Math.max(parseFloat(params.get('cut') ?? '0') || 0, 0), 5);
+  const ringValue = parseFloat(params.get('ring') ?? '2');
+  const ring = Number.isFinite(ringValue) ? Math.min(Math.max(ringValue, 0), 30) : 5;
 
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
@@ -375,7 +428,7 @@ function main() {
 
       renderer.render(scene, camera);
       if (themeName === 'glyph') {
-        renderGlyphCut(canvas, renderer, scene, camera, group, groups, cut);
+        renderGlyphCut(canvas, renderer, scene, camera, group, groups, cut, ring);
       }
       (window as unknown as { __iconDone?: boolean }).__iconDone = true;
     },
