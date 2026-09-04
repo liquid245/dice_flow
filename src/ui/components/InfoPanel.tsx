@@ -8,6 +8,23 @@ const MAX_FONT = 16;
 const LINE_HEIGHT = 20;
 const LINE_FACTOR = LINE_HEIGHT / MAX_FONT;
 const FIT_LIMIT = 2 / 3;
+const EXPANDED_KEY = 'diceflow:ui:historyExpanded';
+
+function readHistoryExpanded(): boolean {
+  try {
+    return localStorage.getItem(EXPANDED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeHistoryExpanded(expanded: boolean): void {
+  try {
+    localStorage.setItem(EXPANDED_KEY, expanded ? '1' : '0');
+  } catch {
+    // localStorage недоступен (например, private mode) — не роняем приложение.
+  }
+}
 
 function historyRowLimit(): number {
   const landscape = window.matchMedia('(orientation: landscape)').matches;
@@ -24,7 +41,7 @@ export function InfoPanel() {
   );
 
   const chunkKey = useMemo(() => feed.chunk.map((entry) => entry.id).join('\n'), [feed.chunk]);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(readHistoryExpanded);
   const [fontSize, setFontSize] = useState(MAX_FONT);
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -157,7 +174,11 @@ export function InfoPanel() {
       className={`info-panel ${modifiers}`}
       aria-expanded={expanded}
       onClick={() => {
-        if (feed.active) setExpanded((value) => !value);
+        if (!feed.active) return;
+        setExpanded((value) => {
+          writeHistoryExpanded(!value);
+          return !value;
+        });
       }}
     >
       <div
