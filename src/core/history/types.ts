@@ -6,4 +6,6 @@ export interface HistoryEntry {
   kind: HistoryKind;
   count: number;
   value?: number;
+  before?: number[];
+  after?: number[];
 }

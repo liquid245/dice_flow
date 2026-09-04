@@ -44,7 +44,16 @@ describe('engine', () => {
     engine.dispatch({ type: 'select', ids: ['d1', 'd2'], mode: 'set' });
     engine.dispatch({ type: 'reroll' });
     const last = engine.getState().history[engine.getState().history.length - 1];
-    expect(last).toMatchObject({ kind: 'reroll', count: 2, value: 6 });
+    expect(last).toMatchObject({ kind: 'reroll', count: 2, value: 6, before: [6, 6], after: [1, 1] });
+  });
+
+  it('stores the rolled dice values after roll', () => {
+    const engine = createEngine(makeDeps());
+    engine.dispatch({ type: 'add', count: 2 });
+    engine.dispatch({ type: 'select', ids: ['d1', 'd2'], mode: 'set' });
+    engine.dispatch({ type: 'roll' });
+    const last = engine.getState().history[engine.getState().history.length - 1];
+    expect(last).toMatchObject({ kind: 'roll', count: 2, after: [1, 1] });
   });
 
   it('undoes and redoes every action, excluding selection', () => {

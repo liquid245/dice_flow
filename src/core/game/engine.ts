@@ -57,7 +57,7 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
 
     const previous = state;
     state = reduce(state, action, deps);
-    const entry = makeEntry(action, previous, deps);
+    const entry = makeEntry(action, previous, state, deps);
     state = isMod ? mergeModEntry(state, entry) : appendEntry(state, entry);
 
     lastAction = action.type;
@@ -125,21 +125,29 @@ function selectedCount(state: GameState): number {
 function makeEntry(
   action: LoggableAction,
   previous: GameState,
+  next: GameState,
   deps: EngineDeps,
 ): HistoryEntry {
   const base = { id: deps.nextId(), timestamp: deps.now() };
   switch (action.type) {
-    case 'roll':
-      return { ...base, kind: 'roll', count: selectedCount(previous) };
+    case 'roll': {
+      const count = selectedCount(previous);
+      if (count === 0) return { ...base, kind: 'roll', count: 0 };
+      return { ...base, kind: 'roll', count, after: next.dice.map((d) => d.value) };
+    }
     case 'reroll': {
       const selected = selectedDice(previous.dice, previous.selection);
       const targets = selected.length > 0 ? selected : previous.dice;
+      if (targets.length === 0) return { ...base, kind: 'reroll', count: 0, before: [], after: [] };
+      const ids = new Set(targets.map((d) => d.id));
       const values = new Set(targets.map((d) => d.value));
       return {
         ...base,
         kind: 'reroll',
         count: targets.length,
         value: values.size === 1 ? targets[0].value : undefined,
+        before: targets.map((d) => d.value),
+        after: next.dice.filter((d) => ids.has(d.id)).map((d) => d.value),
       };
     }
     case 'add':

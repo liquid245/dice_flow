@@ -34,10 +34,14 @@ describe('describeSelection', () => {
     expect(summary).toEqual({ count: 3, valueText: '4+' });
   });
 
-  it('pluralizes a single value', () => {
+  it('renders only sixes as 6+', () => {
     const dice = [die('a', 6), die('b', 6), die('c', 6)];
-    const summary = describeSelection(dice, idsSelection(['a', 'b']));
-    expect(summary).toEqual({ count: 2, valueText: '6s' });
+    expect(describeSelection(dice, idsSelection(['a', 'b']))).toEqual({ count: 2, valueText: '6+' });
+  });
+
+  it('pluralizes a single non-six value', () => {
+    const dice = [die('a', 5), die('b', 5)];
+    expect(describeSelection(dice, idsSelection(['a', 'b']))).toEqual({ count: 2, valueText: '5s' });
   });
 
   it('renders contiguous range without 6 as lo-hi', () => {
@@ -52,15 +56,29 @@ describe('describeSelection', () => {
 });
 
 describe('formatAction', () => {
-  it('formats roll without a count', () => {
+  it('formats roll with count and grouped result', () => {
+    expect(formatAction({ ...entry('roll', 5), after: [6, 6, 5, 5, 5] })).toBe('Roll 5 → 6×2, 5×3');
+  });
+
+  it('formats roll without stored result as verb only', () => {
     expect(formatAction(entry('roll', 20))).toBe('Roll');
   });
 
-  it('formats reroll with uniform value', () => {
-    expect(formatAction(entry('reroll', 4, 6))).toBe('Reroll 4 6s');
+  it('formats reroll with before and after', () => {
+    expect(formatAction({ ...entry('reroll', 4, 6), before: [6, 6, 6, 6], after: [6, 6, 5, 3] })).toBe(
+      'Reroll 4 6+ → 6×2, 5, 3',
+    );
   });
 
-  it('formats reroll without value', () => {
+  it('formats reroll with only a stored result', () => {
+    expect(formatAction({ ...entry('reroll', 2), after: [4, 3] })).toBe('Reroll 2 → 4, 3');
+  });
+
+  it('formats legacy reroll with uniform value', () => {
+    expect(formatAction(entry('reroll', 4, 6))).toBe('Reroll 4 6+');
+  });
+
+  it('formats legacy reroll without value', () => {
     expect(formatAction(entry('reroll', 6))).toBe('Reroll 6');
   });
 

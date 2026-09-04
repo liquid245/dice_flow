@@ -14,6 +14,20 @@ export function currentIteration(history: HistoryEntry[]): HistoryEntry[] {
   return history.slice();
 }
 
+function valueTextFor(values: number[]): string {
+  const unique = Array.from(new Set(values)).sort((a, b) => a - b);
+  if (unique.length === 0) return '';
+  const contiguous = unique.every((value, i) => i === 0 || value === unique[i - 1] + 1);
+  if (contiguous) {
+    const first = unique[0];
+    const last = unique[unique.length - 1];
+    if (last === 6) return `${first}+`;
+    if (first === last) return `${first}${uiHistory.pluralSuffix}`;
+    return `${first}-${last}`;
+  }
+  return unique.join(uiHistory.listSep);
+}
+
 export interface SelectedSummary {
   count: number;
   valueText: string;
@@ -22,36 +36,47 @@ export interface SelectedSummary {
 export function describeSelection(dice: Die[], selection: Selection): SelectedSummary | null {
   const selectedValues = dice.filter((d) => isDieSelected(d, selection)).map((d) => d.value);
   if (selectedValues.length === 0) return null;
-  const unique = Array.from(new Set(selectedValues)).sort((a, b) => a - b);
-  const contiguous = unique.every((value, i) => i === 0 || value === unique[i - 1] + 1);
-  let valueText: string;
-  if (unique.length === 1) {
-    valueText = `${unique[0]}${uiHistory.pluralSuffix}`;
-  } else if (contiguous && unique[unique.length - 1] === 6) {
-    valueText = `${unique[0]}+`;
-  } else if (contiguous) {
-    valueText = `${unique[0]}-${unique[unique.length - 1]}`;
-  } else {
-    valueText = unique.join(uiHistory.listSep);
-  }
-  return { count: selectedValues.length, valueText };
+  return { count: selectedValues.length, valueText: valueTextFor(selectedValues) };
 }
 
 export function formatSelectionText(summary: SelectedSummary): string {
   return `${uiHistory.selectWord} ${summary.count} (${summary.valueText})`;
 }
 
+function formatGrouped(values: number[]): string {
+  const counts = new Map<number, number>();
+  for (const value of values) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  const parts: string[] = [];
+  for (const value of Array.from(counts.keys()).sort((a, b) => b - a)) {
+    const count = counts.get(value) as number;
+    parts.push(count > 1 ? `${value}×${count}` : `${value}`);
+  }
+  return parts.join(uiHistory.listSep);
+}
+
 export function formatAction(entry: HistoryEntry): string {
   const verb = uiHistory.verbs[entry.kind] ?? entry.kind;
   switch (entry.kind) {
     case 'roll':
+      return entry.after && entry.after.length > 0
+        ? `${verb} ${entry.after.length} ${uiHistory.arrow} ${formatGrouped(entry.after)}`
+        : verb;
     case 'clear':
       return verb;
-    case 'reroll':
+    case 'reroll': {
+      const before = entry.before && entry.before.length > 0 ? valueTextFor(entry.before) : '';
+      if (entry.after && entry.after.length > 0) {
+        return before
+          ? `${verb} ${entry.after.length} ${before} ${uiHistory.arrow} ${formatGrouped(entry.after)}`
+          : `${verb} ${entry.after.length} ${uiHistory.arrow} ${formatGrouped(entry.after)}`;
+      }
       if (entry.count > 0 && entry.value !== undefined) {
-        return `${verb} ${entry.count} ${entry.value}${uiHistory.pluralSuffix}`;
+        return `${verb} ${entry.count} ${valueTextFor([entry.value])}`;
       }
       return entry.count > 0 ? `${verb} ${entry.count}` : verb;
+    }
     case 'move':
       return entry.count > 0 && entry.value !== undefined
         ? `${verb} ${entry.count} ${uiHistory.arrow} ${entry.value}`
