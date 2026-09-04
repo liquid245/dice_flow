@@ -43,6 +43,17 @@ const THEMES: Record<string, ThemeConfig> = {
     ambient: 0.6,
     key: 2,
   },
+  alpha: {
+    body: null,
+    pips: null,
+    roughness: null,
+    envIntensity: 1.2,
+    background: null,
+    flat: false,
+    shadowOpacity: 0,
+    ambient: 0.7,
+    key: 1.8,
+  },
 };
 
 function mergeByMaterial(scene: THREE.Object3D): LodGroup[] {
@@ -131,87 +142,77 @@ function makeShadowTexture(): THREE.Texture {
   return new THREE.CanvasTexture(canvas);
 }
 
-function isBodyGreen(r: number, g: number, b: number): boolean {
-  return g > 60 && g > r * 1.5 && g > b * 1.5;
+const BODY_ALPHA = 180;interface CanvasCopy {
+  img: ImageData;
 }
 
-const RING_RADIUS = 9;
-const RING_COLOR: readonly [number, number, number] = [0x70, 0x70, 0x77];
-
-function finalizeCutout(src: HTMLCanvasElement): void {
-  const w = src.width;
-  const h = src.height;
-  const n = w * h;
-
+function copyCanvas(src: HTMLCanvasElement): CanvasCopy | null {
   const layer = document.createElement('canvas');
-  layer.width = w;
-  layer.height = h;
-  const lctx = layer.getContext('2d');
-  if (!lctx) return;
-  lctx.drawImage(src, 0, 0);
-  const img = lctx.getImageData(0, 0, w, h);
-  const d = img.data;
+  layer.width = src.width;
+  layer.height = src.height;
+  const ctx = layer.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(src, 0, 0);
+  return { img: ctx.getImageData(0, 0, src.width, src.height) };
+}
 
-  const mask = new Uint8Array(n);
-  for (let i = 0; i < n; i++) {
-    if (d[i * 4 + 3] > 24) mask[i] = 1;
-  }
-
+function composeAlphaBody(body: ImageData, pips: ImageData): ImageData {
+  const n = body.width * body.height;
+  const out = new ImageData(body.width, body.height);
+  const b = body.data;
+  const p = pips.data;
+  const o = out.data;
   for (let i = 0; i < n; i++) {
     const j = i * 4;
-    if (mask[i] && isBodyGreen(d[j], d[j + 1], d[j + 2])) {
-      d[j] = 0;
-      d[j + 1] = 0;
-      d[j + 2] = 0;
-      d[j + 3] = 0;
+    const baseAlpha = b[j + 3];
+    if (baseAlpha <= 8) continue;
+    o[j] = b[j];
+    o[j + 1] = b[j + 1];
+    o[j + 2] = b[j + 2];
+    if (p[j + 3] > 24) {
+      o[j + 3] = 255;
+    } else {
+      o[j + 3] = Math.round((baseAlpha / 255) * BODY_ALPHA);
+    }
+  }
+  return out;
+}
+
+function renderAlphaIcon(
+  canvas: HTMLCanvasElement,
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.OrthographicCamera,
+  group: THREE.Group,
+  groups: LodGroup[],
+): void {
+  renderer.render(scene, camera);
+  const passA = copyCanvas(canvas);
+  if (!passA) return;
+
+  const children = group.children as THREE.Mesh[];
+  for (let i = 0; i < children.length; i++) {
+    if (isPips(groups[i].material)) {
+      children[i].material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    } else {
+      children[i].visible = false;
     }
   }
 
-  const ring = new Uint8Array(n);
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const i = y * w + x;
-      if (!mask[i]) continue;
-      if (mask[i - 1] === 0 || mask[i + 1] === 0 || mask[i - w] === 0 || mask[i + w] === 0) ring[i] = 1;
-    }
-  }
+  renderer.render(scene, camera);
+  const passB = copyCanvas(canvas);
+  if (!passB) return;
 
-  let ringPixels = ring;
-  for (let k = 0; k < RING_RADIUS; k++) {
-    const next = new Uint8Array(ringPixels);
-    for (let y = 1; y < h - 1; y++) {
-      for (let x = 1; x < w - 1; x++) {
-        const i = y * w + x;
-        if (ringPixels[i]) continue;
-        if (
-          ringPixels[i - 1] ||
-          ringPixels[i + 1] ||
-          ringPixels[i - w] ||
-          ringPixels[i + w] ||
-          ringPixels[i - w - 1] ||
-          ringPixels[i - w + 1] ||
-          ringPixels[i + w - 1] ||
-          ringPixels[i + w + 1]
-        ) {
-          next[i] = 1;
-        }
-      }
-    }
-    ringPixels = next;
-  }
-
-  for (let i = 0; i < n; i++) {
-    if (ringPixels[i]) {
-      d[i * 4] = RING_COLOR[0];
-      d[i * 4 + 1] = RING_COLOR[1];
-      d[i * 4 + 2] = RING_COLOR[2];
-      d[i * 4 + 3] = 255;
-    }
-  }
-
-  lctx.putImageData(img, 0, 0);
-  src.remove();
+  const composed = composeAlphaBody(passA.img, passB.img);
+  canvas.remove();
+  const layer = document.createElement('canvas');
+  layer.width = canvas.width;
+  layer.height = canvas.height;
+  const ctx = layer.getContext('2d');
+  if (!ctx) return;
+  ctx.putImageData(composed, 0, 0);
   document.body.appendChild(layer);
+  (window as unknown as { __iconDone?: boolean }).__iconDone = true;
 }
 
 function main() {
@@ -282,14 +283,7 @@ function main() {
   loader.loadAsync('./dice-2.glb').then(
     (gltf) => {
       const groups = mergeByMaterial(gltf.scene);
-      const materials =
-        themeName === 'cutout'
-          ? groups.map((group) =>
-              isPips(group.material)
-                ? new THREE.MeshStandardMaterial({ color: 0x74747c, roughness: 0.25, metalness: 0.03, envMapIntensity: 1.8 })
-                : new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
-            )
-          : buildMaterials(groups, theme);
+      const materials = buildMaterials(groups, theme);
       for (let i = 0; i < groups.length; i++) {
         group.add(new THREE.Mesh(groups[i].geometry, materials[i]));
       }
@@ -305,7 +299,12 @@ function main() {
       camera.bottom = -half;
       camera.updateProjectionMatrix();
 
-      if (theme.shadowOpacity > 0 && themeName !== 'cutout') {
+      if (themeName === 'alpha') {
+        renderAlphaIcon(canvas, renderer, scene, camera, group, groups);
+        return;
+      }
+
+      if (theme.shadowOpacity > 0) {
         const shadow = new THREE.Mesh(
           new THREE.PlaneGeometry(1, 1),
           new THREE.MeshBasicMaterial({
@@ -321,9 +320,6 @@ function main() {
       }
 
       renderer.render(scene, camera);
-      if (themeName === 'cutout') {
-        finalizeCutout(canvas);
-      }
       (window as unknown as { __iconDone?: boolean }).__iconDone = true;
     },
     (error) => reportError('parse: ' + String(error)),
