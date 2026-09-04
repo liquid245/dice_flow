@@ -1,49 +1,58 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useGame } from '../../app/game';
-import { changesSinceLastRoll } from '../../core/history/selectors';
-import { selectedDice } from '../../core/selection/selection';
-import type { HistoryEntry } from '../../core/history/types';
 import { config } from '../../config';
+import { currentIteration, describeSelection, formatAction, formatSelectionText } from '../feed';
 
 const MIN_FONT = 8;
 const MAX_FONT = 16;
-const MAX_LINES = 3;
+const MAX_ROWS = 3;
 
-function formatEntry(entry: HistoryEntry): string {
-  const history = config.ui.history;
-  const kind = history.kindLabels[entry.kind] ?? entry.kind;
-  const count = entry.count > 0 ? `${history.countPrefix}${entry.count}` : '';
-  const value = entry.value !== undefined ? `${history.valuePrefix}${entry.value}` : '';
-  return history.format.replace('{kind}', kind).replace('{count}', count).replace('{value}', value);
+interface View {
+  rows: string[];
+  centered: boolean;
 }
 
 export function InfoPanel() {
   const { state } = useGame();
-  const selected = selectedDice(state.dice, state.selection).length;
-  const changes = useMemo(() => changesSinceLastRoll(state.history), [state.history]);
   const infoPanel = config.ui.infoPanel;
+  const uiHistory = config.ui.history;
 
   const rootRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const [fontSize, setFontSize] = useState(MAX_FONT);
-  const [lines, setLines] = useState<string[][]>([]);
+  const [view, setView] = useState<View>({ rows: [''], centered: false });
 
-  const items = useMemo(() => {
-    return state.dice.length === 0
-      ? [infoPanel.swipeHint]
-      : [
-          `${state.dice.length} D6`,
-          ...changes.map((entry) => formatEntry(entry)),
-          ...(selected > 0 ? [`Selected: ${selected}`] : []),
-        ];
-  }, [state.dice.length, changes, selected, infoPanel.swipeHint]);
+  const content = useMemo<View>(() => {
+    if (state.dice.length === 0) {
+      return { rows: [infoPanel.swipeHint], centered: true };
+    }
+    const entries = currentIteration(state.history);
+    const lastEntries = entries.length > MAX_ROWS ? entries.slice(entries.length - MAX_ROWS) : entries;
+    const rows = lastEntries.map((entry) => formatAction(entry));
+    const totalText = `${state.dice.length} ${uiHistory.diceWord}`;
+    if (rows.length === 0) {
+      const selection = describeSelection(state.dice, state.selection);
+      const selectionText = selection ? formatSelectionText(selection) : null;
+      return {
+        rows: [selectionText ? `${totalText}${uiHistory.segmentSep}${selectionText}` : totalText],
+        centered: false,
+      };
+    }
+    const selection = describeSelection(state.dice, state.selection);
+    const selectionText = selection ? formatSelectionText(selection) : null;
+    const lastText = formatAction(entries[entries.length - 1]);
+    rows[rows.length - 1] = [lastText, totalText, selectionText]
+      .filter((part): part is string => part !== null)
+      .join(uiHistory.segmentSep);
+    return { rows, centered: false };
+  }, [state.dice, state.history, state.selection, infoPanel.swipeHint, uiHistory]);
 
   useLayoutEffect(() => {
     const root = rootRef.current;
-    const content = contentRef.current;
+    const contentBox = contentRef.current;
     const measure = measureRef.current;
-    if (!root || !content || !measure) return;
+    if (!root || !contentBox || !measure) return;
 
     const measureWidth = (text: string, size: number): number => {
       measure.style.fontSize = `calc(var(--font-scale) * ${size}px)`;
@@ -70,36 +79,22 @@ export function InfoPanel() {
     const fit = () => {
       applySize();
 
-      const maxWidth = content.clientWidth;
+      const maxWidth = contentBox.clientWidth;
       let bestSize = MIN_FONT;
-      let bestLines: string[][] = [[]];
-
       for (let size = MAX_FONT; size >= MIN_FONT; size--) {
-        const laid: string[][] = [[]];
-        for (const item of items) {
-          const line = laid[laid.length - 1];
-          const candidate = line.length === 0 ? item : `${line.join(' · ')} · ${item}`;
-          if (line.length === 0 || measureWidth(candidate, size) <= maxWidth) {
-            line.push(item);
-          } else {
-            laid.push([item]);
-          }
+        if (content.rows.every((row) => measureWidth(row, size) <= maxWidth)) {
+          bestSize = size;
+          break;
         }
-        bestSize = size;
-        bestLines = laid;
-        if (laid.length <= MAX_LINES) break;
-      }
-
-      if (bestLines.length > MAX_LINES) {
-        bestLines = bestLines.slice(-MAX_LINES);
       }
 
       setFontSize((prev) => (prev === bestSize ? prev : bestSize));
-      setLines((prev) => {
-        if (prev.length === bestLines.length && prev.every((line, i) => line.join('\u0000') === bestLines[i].join('\u0000'))) {
-          return prev;
+      setView((prev) => {
+        if (prev.centered === content.centered && prev.rows.length === content.rows.length) {
+          const same = prev.rows.every((row, i) => row === content.rows[i]);
+          if (same) return prev;
         }
-        return bestLines;
+        return content;
       });
     };
 
@@ -107,26 +102,18 @@ export function InfoPanel() {
     const observer = new ResizeObserver(fit);
     observer.observe(root);
     return () => observer.disconnect();
-  }, [items]);
+  }, [content]);
 
   return (
     <div ref={rootRef} className="info-panel">
       <div
         ref={contentRef}
         className="info-panel-content"
-        style={{
-          fontSize: `calc(var(--font-scale) * ${fontSize}px)`,
-          alignItems: infoPanel.centered ? 'center' : 'flex-start',
-        }}
+        style={{ fontSize: `calc(var(--font-scale) * ${fontSize}px)` }}
       >
-        {lines.map((line, i) => (
-          <div key={i} className="history-line">
-            {line.map((item, j) => (
-              <span key={j}>
-                {j > 0 && <span className="dot"> · </span>}
-                {item}
-              </span>
-            ))}
+        {view.rows.map((row, i) => (
+          <div key={i} className={view.centered ? 'history-line history-line--center' : 'history-line'}>
+            {row}
           </div>
         ))}
         <span ref={measureRef} className="measure" aria-hidden="true" />

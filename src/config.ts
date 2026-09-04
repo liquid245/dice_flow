@@ -118,17 +118,20 @@ export const config = {
       swipeHint: 'Swipe finger to add or reduce dices',
     },
     history: {
-      kindLabels: {
+      verbs: {
         roll: 'Roll',
         reroll: 'Reroll',
         add: 'Add',
-        delete: 'Delete',
+        delete: 'Remove',
         move: 'Move',
         clear: 'Clear',
       } as Record<string, string>,
-      format: '{kind}{count}{value}',
-      countPrefix: ' ',
-      valuePrefix: ':',
+      arrow: '→',
+      pluralSuffix: 's',
+      diceWord: 'dice',
+      selectWord: 'Sel',
+      listSep: ', ',
+      segmentSep: ' · ',
     },
   },
   vibration: {

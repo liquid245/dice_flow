@@ -61,15 +61,14 @@ body {
 }
 
 .history-line {
-  display: flex;
-}
-
-.history-line span {
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
-.history-line .dot {
-  flex-shrink: 0;
+.history-line--center {
+  text-align: center;
 }
 
 .measure {
