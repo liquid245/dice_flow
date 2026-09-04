@@ -7,6 +7,7 @@ export interface GameState {
   dice: Die[];
   history: HistoryEntry[];
   selection: Selection;
+  hydrated?: boolean;
 }
 
 export function createInitialState(): GameState {

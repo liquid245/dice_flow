@@ -109,7 +109,7 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
       lastAction = null;
     },
     restore(restored: GameState) {
-      state = { ...normalizeState(restored), selection: noneSelection };
+      state = { ...normalizeState(restored), hydrated: true, selection: noneSelection };
       undoStack.length = 0;
       redoStack = [];
       lastAction = null;

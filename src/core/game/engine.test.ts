@@ -269,7 +269,21 @@ describe('engine', () => {
     });
     expect(engine.getState().dice).toHaveLength(1);
     expect(engine.getState().selection).toEqual(noneSelection);
+    expect(engine.getState().hydrated).toBe(true);
     expect(engine.canUndo()).toBe(false);
     expect(engine.canRedo()).toBe(false);
+  });
+
+  it('marks state as hydrated only after a restore', () => {
+    const engine = createEngine(makeDeps());
+    expect(engine.getState().hydrated).toBeUndefined();
+    engine.dispatch({ type: 'add', count: 1 });
+    expect(engine.getState().hydrated).toBeUndefined();
+    engine.restore({
+      dice: [],
+      history: [],
+      selection: noneSelection,
+    });
+    expect(engine.getState().hydrated).toBe(true);
   });
 });

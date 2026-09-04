@@ -68,6 +68,7 @@ export class DiceRenderer {
   private rafId: number | null = null;
   private hasDice = false;
   private synced = false;
+  private restoreApplied = false;
   private dirty = false;
   private hapticActive = false;
   private pendingShrink = false;
@@ -366,22 +367,25 @@ export class DiceRenderer {
       return;
     }
     const isInitial = !this.synced;
+    const restore = state.hydrated === true && !this.restoreApplied;
+    if (restore) this.restoreApplied = true;
+    const establishing = isInitial || restore;
     this.synced = true;
     this.hasDice = state.dice.length > 0;
 
-    const layoutChanged = isInitial || this.layoutChanged(this.lastState?.dice ?? [], state.dice);
+    const layoutChanged = establishing || this.layoutChanged(this.lastState?.dice ?? [], state.dice);
     this.lastState = state;
     this.groupsByValue = groupDice(state.dice);
 
     if (layoutChanged) {
       this.layout = layout(state.dice, this.maxPerRow, this.aspect);
       this.updatePlateGeometry();
-      this.fitCamera(!isInitial);
+      this.fitCamera(!establishing);
     }
 
     const now = performance.now();
     const selectionChanged = this.reconcileSelection(state, now);
-    if (isInitial) {
+    if (establishing) {
       this.populateInitial(state);
       this.prev = this.snapshots(state);
       this.writeAllMatrices(now);
@@ -389,7 +393,7 @@ export class DiceRenderer {
       this.applyStateTransitions(state, layoutChanged);
     }
 
-    if (selectionChanged && !layoutChanged && !isInitial) {
+    if (selectionChanged && !layoutChanged && !establishing) {
       if (this.selected.size > 0) {
         play('select');
         vibrate('select');
