@@ -6,7 +6,6 @@ import { noneSelection } from '../selection/selection';
 export interface GameState {
   dice: Die[];
   history: HistoryEntry[];
-  swipeAddAvailable: boolean;
   selection: Selection;
 }
 
@@ -14,7 +13,6 @@ export function createInitialState(): GameState {
   return {
     dice: [],
     history: [],
-    swipeAddAvailable: true,
     selection: noneSelection,
   };
 }
@@ -26,7 +24,6 @@ interface LegacyDie extends Die {
 interface LegacyState {
   dice?: LegacyDie[];
   history?: HistoryEntry[];
-  swipeAddAvailable?: boolean;
   selectedGroups?: { min: number; max: number } | null;
 }
 
@@ -52,7 +49,6 @@ export function normalizeState(raw: GameState | LegacyState): GameState {
       origin: die.origin,
     })),
     history: legacy.history ?? [],
-    swipeAddAvailable: legacy.swipeAddAvailable ?? true,
     selection: 'selection' in raw && raw.selection && typeof (raw.selection as Selection).kind === 'string'
       ? (raw.selection as Selection)
       : selection,

@@ -42,7 +42,6 @@ function addDice(state: GameState, count: number, values: number[] | undefined, 
   return {
     ...state,
     dice: [...state.dice, ...added],
-    swipeAddAvailable: false,
     selection: noneSelection,
   };
 }
@@ -61,7 +60,6 @@ function deleteDice(state: GameState, count: number | undefined): GameState {
   return {
     ...state,
     dice: remaining,
-    swipeAddAvailable: false,
     selection: noneSelection,
   };
 }
@@ -138,5 +136,5 @@ function selectGroupRange(state: GameState, min: number, max: number): GameState
 }
 
 function clear(state: GameState): GameState {
-  return { ...state, dice: [], swipeAddAvailable: true, selection: noneSelection };
+  return { ...state, dice: [], selection: noneSelection };
 }

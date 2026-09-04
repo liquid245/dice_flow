@@ -5,7 +5,7 @@ import { initPersistence, type PersistableEngine } from './persistence';
 import type { GameStorage } from './storage';
 
 function empty(): GameState {
-  return { dice: [], history: [], swipeAddAvailable: true, selection: noneSelection };
+  return { dice: [], history: [], selection: noneSelection };
 }
 
 function fakeEngine(initial: GameState): PersistableEngine & { emit(): void; setState(state: GameState): void } {
@@ -46,7 +46,11 @@ describe('initPersistence', () => {
   });
 
   it('restores the saved state on init', async () => {
-    const saved = { dice: [], history: [], swipeAddAvailable: false, selection: noneSelection };
+    const saved: GameState = {
+      dice: [{ id: 'd1', type: 'd6', value: 5, origin: 'add' }],
+      history: [],
+      selection: noneSelection,
+    };
     const engine = fakeEngine(empty());
     const storage = fakeStorage(saved);
 
@@ -54,7 +58,7 @@ describe('initPersistence', () => {
     await vi.advanceTimersByTimeAsync(0);
     await Promise.resolve();
 
-    expect(engine.getState().swipeAddAvailable).toBe(false);
+    expect(engine.getState()).toEqual(saved);
   });
 
   it('does not overwrite a change made before loading completes', async () => {
@@ -71,10 +75,10 @@ describe('initPersistence', () => {
     const engine = fakeEngine(empty());
 
     initPersistence(engine, storage);
-    const changed = { ...empty(), swipeAddAvailable: false };
+    const changed = { ...empty() };
     engine.setState(changed);
     engine.emit();
-    resolveLoad!({ ...empty(), swipeAddAvailable: true });
+    resolveLoad!({ ...empty() });
     await Promise.resolve();
 
     expect(engine.getState()).toBe(changed);

@@ -28,11 +28,11 @@ function ids(...values: string[]): Selection {
 const rand = (v: number) => (v - 1) / 6;
 
 function stateWith(dice: Die[], selection: Selection = noneSelection): GameState {
-  return { dice, history: [], swipeAddAvailable: false, selection };
+  return { dice, history: [], selection };
 }
 
 describe('add', () => {
-  it('adds dice with random values and clears swipe availability', () => {
+  it('adds dice with random values', () => {
     const deps = makeDeps([rand(6), rand(3), rand(1)]);
     const state = reduce(createInitialState(), { type: 'add', count: 3 }, deps);
     expect(state.dice).toEqual([
@@ -40,7 +40,6 @@ describe('add', () => {
       { id: 'd2', type: 'd6', value: 3, origin: 'add' },
       { id: 'd3', type: 'd6', value: 1, origin: 'add' },
     ]);
-    expect(state.swipeAddAvailable).toBe(false);
   });
 
   it('uses explicit values when provided', () => {
@@ -215,11 +214,10 @@ describe('selectGroups', () => {
 });
 
 describe('clear', () => {
-  it('empties the table and re-enables the swipe', () => {
+  it('empties the table', () => {
     const state = stateWith([die('a', 1)]);
     const next = reduce(state, { type: 'clear' }, makeDeps([]));
     expect(next.dice).toEqual([]);
-    expect(next.swipeAddAvailable).toBe(true);
   });
 });
 

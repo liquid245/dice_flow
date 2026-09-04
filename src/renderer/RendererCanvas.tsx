@@ -57,7 +57,7 @@ export function RendererCanvas() {
     groupAt: (x, y) => rendererRef.current?.groupAt(x, y),
   };
 
-  const swipe = useSwipeAdd(engine, () => state.swipeAddAvailable && state.dice.length === 0);
+  const swipe = useSwipeAdd(engine, () => state.dice.length === 0);
   const selected = selectedIds(state.dice, state.selection);
   const drag = useDragMove(
     engine,
