@@ -38,13 +38,15 @@ function waitForServer() {
   });
 }
 
-function render(out, { theme = 'light', fill = null, view = null, face = null, radius = 0 } = {}) {
+function render(out, { theme = 'light', fill = null, view = null, face = null, radius = 0, gradTop = null, gradBottom = null } = {}) {
   const params = new URLSearchParams();
   params.set('theme', theme);
   if (fill) params.set('fill', String(fill));
   if (view !== null) params.set('view', String(view));
   if (face !== null) params.set('face', String(face));
   if (radius > 0) params.set('radius', String(radius));
+  if (gradTop !== null) params.set('gradtop', String(gradTop));
+  if (gradBottom !== null) params.set('gradbot', String(gradBottom));
   const url = `http://127.0.0.1:${port}/icon-render.html?${params}`;
   run(chrome, [
     '--headless=new',
@@ -124,6 +126,9 @@ try {
   const iosMaster = join(tmp, 'die-glyph.png');
   render(iosMaster, { theme: 'glyph', fill: 1.0 });
 
+  const iosTouchMaster = join(tmp, 'die-glyph-touch.png');
+  render(iosTouchMaster, { theme: 'glyph', fill: 1.0, gradTop: 140, gradBottom: 20 });
+
   if (target === 'probe') {
     const probes = [];
     for (let v = 0; v < 7; v++) {
@@ -173,7 +178,7 @@ try {
     [180, 180, join(root, 'public', 'icons', 'apple-touch-icon-180.png')],
     [152, 152, join(root, 'public', 'icons', 'apple-touch-icon-152.png')],
   ];
-  for (const [w, h, out] of iosOutputs) resize(w, h, iosMaster, out);
+  for (const [w, h, out] of iosOutputs) resize(w, h, iosTouchMaster, out);
 
   console.log('Icons generated.');
 } finally {
