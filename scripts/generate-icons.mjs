@@ -121,6 +121,9 @@ try {
   render(masters.dark.master, { theme: 'dark', radius });
   render(masters.dark.maskable, { theme: 'dark', fill: 0.78 });
 
+  const iosMaster = join(tmp, 'die-light-ios.png');
+  render(iosMaster, { theme: 'light' });
+
   if (target === 'probe') {
     const probes = [];
     for (let v = 0; v < 7; v++) {
@@ -161,6 +164,12 @@ try {
 
   resize(512, 512, masters.light.maskable, join(root, 'public', 'icons', 'maskable-512.png'));
   resize(512, 512, masters.dark.maskable, join(root, 'public', 'icons', 'maskable-dark-512.png'));
+
+  const iosOutputs = [
+    [180, 180, join(root, 'public', 'icons', 'apple-touch-icon-180.png')],
+    [152, 152, join(root, 'public', 'icons', 'apple-touch-icon-152.png')],
+  ];
+  for (const [w, h, out] of iosOutputs) resize(w, h, iosMaster, out);
 
   console.log('Icons generated.');
 } finally {
