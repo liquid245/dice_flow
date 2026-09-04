@@ -45,10 +45,20 @@ export function InfoPanel() {
       return measure.getBoundingClientRect().width;
     };
 
+    let singleRow = false;
+    let buttonFont = MAX_FONT;
+
     const applySize = () => {
-      const btn = document.querySelector<HTMLElement>('.action-bar button');
-      if (!btn) return;
+      const bar = document.querySelector<HTMLElement>('.action-bar');
+      const btn = bar?.querySelector<HTMLElement>('button');
+      if (!bar || !btn) return;
       const rect = btn.getBoundingClientRect();
+      singleRow = getComputedStyle(bar).flexDirection === 'row';
+      const fontScale =
+        parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
+      const btnFont = parseFloat(getComputedStyle(btn).fontSize) / fontScale;
+      buttonFont = Math.max(MIN_FONT, Math.min(MAX_FONT, Math.round(btnFont)));
+
       const row = document.querySelector<HTMLElement>('.action-row');
       let gap = 8;
       if (row) {
@@ -57,9 +67,10 @@ export function InfoPanel() {
         const rg = parseFloat(cs.rowGap);
         gap = Number.isFinite(cg) ? cg : Number.isFinite(rg) ? rg : 8;
       }
-      root.style.width = `${Math.ceil(rect.width * 3 + gap * 2)}px`;
-      const collapsedHeight = Math.ceil(rect.height * 2 + gap);
+      root.style.width = singleRow ? '' : `${Math.ceil(rect.width * 3 + gap * 2)}px`;
+      const collapsedHeight = singleRow ? Math.ceil(rect.height) : Math.ceil(rect.height * 2 + gap);
       if (expanded) {
+        contentBox.style.lineHeight = '';
         root.style.height = '';
         const cs = getComputedStyle(root);
         const outer =
@@ -70,6 +81,7 @@ export function InfoPanel() {
         const band = Math.max(0, Math.round((collapsedHeight - outer - LINE_HEIGHT) / 2));
         root.style.setProperty('--panel-band', `${band}px`);
       } else {
+        contentBox.style.lineHeight = singleRow ? 'normal' : '';
         root.style.height = `${collapsedHeight}px`;
         root.style.setProperty('--panel-band', '0px');
       }
@@ -78,14 +90,19 @@ export function InfoPanel() {
     const fit = () => {
       applySize();
 
-      if (expanded || feed.system) {
+      if (expanded) {
         setFontSize((prev) => (prev === MAX_FONT ? prev : MAX_FONT));
+        return;
+      }
+      const maxFont = singleRow ? buttonFont : MAX_FONT;
+      if (feed.system) {
+        setFontSize((prev) => (prev === maxFont ? prev : maxFont));
         return;
       }
 
       const maxWidth = contentBox.clientWidth;
       let bestSize = MIN_FONT;
-      for (let size = MAX_FONT; size >= MIN_FONT; size--) {
+      for (let size = maxFont; size >= MIN_FONT; size--) {
         if (measureWidth(feed.summary, size) <= maxWidth) {
           bestSize = size;
           break;
@@ -97,7 +114,11 @@ export function InfoPanel() {
     fit();
     const observer = new ResizeObserver(fit);
     observer.observe(root);
-    return () => observer.disconnect();
+    window.addEventListener('resize', fit);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', fit);
+    };
   }, [feed.summary, feed.system, expanded]);
 
   useLayoutEffect(() => {
