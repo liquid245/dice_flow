@@ -39,25 +39,25 @@ describe('describeSelection', () => {
     expect(describeSelection(dice, idsSelection(['a', 'b', 'c']))).toEqual({ count: 3, valueText: '6+' });
   });
 
-  it('renders a partially selected single group as Some of value', () => {
+  it('renders a partially selected single group as some of value', () => {
     const dice = [die('a', 6), die('b', 6), die('c', 6)];
     const summary = describeSelection(dice, idsSelection(['a', 'b']));
-    expect(summary).toEqual({ count: 2, valueText: 'Some of 6' });
-    expect(formatSelectionText(summary as NonNullable<typeof summary>)).toBe('Selected 2 (Some of 6)');
+    expect(summary).toEqual({ count: 2, valueText: 'some of 6' });
+    expect(formatSelectionText(summary as NonNullable<typeof summary>)).toBe('Selected 2 (some of 6)');
   });
 
   it('renders a partially selected value window without X+ notation', () => {
     const dice = [die('a', 6), die('b', 6), die('c', 6), die('d', 5), die('e', 5), die('f', 4), die('g', 4)];
     const summary = describeSelection(dice, idsSelection(['a', 'b', 'd', 'e', 'f']));
-    expect(summary).toEqual({ count: 5, valueText: 'Some of 4-6' });
-    expect(formatSelectionText(summary as NonNullable<typeof summary>)).toBe('Selected 5 (Some of 4-6)');
+    expect(summary).toEqual({ count: 5, valueText: 'some of 4-6' });
+    expect(formatSelectionText(summary as NonNullable<typeof summary>)).toBe('Selected 5 (some of 4-6)');
   });
 
-  it('renders a partially selected non-six window as Some of lo-hi', () => {
+  it('renders a partially selected non-six window as some of lo-hi', () => {
     const dice = [die('a', 3), die('b', 3), die('c', 2), die('d', 1)];
     expect(describeSelection(dice, idsSelection(['a', 'c', 'd']))).toEqual({
       count: 3,
-      valueText: 'Some of 1-3',
+      valueText: 'some of 1-3',
     });
   });
 
@@ -92,15 +92,15 @@ describe('formatAction', () => {
     );
   });
 
-  it('formats roll of a partial group as Some of', () => {
+  it('formats roll of a partial group as some of', () => {
     expect(formatAction({ ...entry('roll', 3), before: [5, 5, 4], totals: { 5: 2, 4: 2 }, after: [6, 1, 1] })).toBe(
-      'Roll 3 Some of 4-5 → 6, 1×2',
+      'Roll 3 some of 4-5 → 6, 1×2',
     );
   });
 
   it('formats roll of a partially taken single group', () => {
     expect(formatAction({ ...entry('roll', 2), before: [6, 6], totals: { 6: 4 }, after: [3, 1] })).toBe(
-      'Roll 2 Some of 6 → 3, 1',
+      'Roll 2 some of 6 → 3, 1',
     );
   });
 
@@ -136,7 +136,7 @@ describe('formatAction', () => {
 
   it('formats delete with removed values', () => {
     expect(formatAction({ ...entry('delete', 3), before: [6, 6, 5], totals: { 6: 3, 5: 2 } })).toBe(
-      'Remove 3 Some of 5-6',
+      'Remove 3 some of 5-6',
     );
   });
 
