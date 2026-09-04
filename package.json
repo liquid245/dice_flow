@@ -1,7 +1,7 @@
 {
   "name": "dice-flow",
   "private": true,
-  "version": "0.3.98",
+  "version": "0.3.99",
   "type": "module",
   "engines": {
     "node": ">=20"

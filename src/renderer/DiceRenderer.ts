@@ -144,6 +144,9 @@ export class DiceRenderer {
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
     document.addEventListener('visibilitychange', this.onVisibilityChange);
+    window.addEventListener('pageshow', this.onPageShow);
+    canvas.addEventListener('webglcontextlost', this.onContextLost);
+    canvas.addEventListener('webglcontextrestored', this.onContextRestored);
     this.resize();
   }
 
@@ -386,6 +389,7 @@ export class DiceRenderer {
     const now = performance.now();
     const selectionChanged = this.reconcileSelection(state, now);
     if (establishing) {
+      this.resetTransient();
       this.populateInitial(state);
       this.prev = this.snapshots(state);
       this.writeAllMatrices(now);
@@ -417,6 +421,20 @@ export class DiceRenderer {
     for (const die of state.dice) {
       const position = this.layout.positions.get(die.id);
       this.allocateSlot(die.id, die.value, position?.x ?? 0, position?.y ?? 0);
+    }
+  }
+
+  private resetTransient(): void {
+    this.dragId = null;
+    this.dragSolo = false;
+    this.dragOffsets.clear();
+    this.dragTarget = null;
+    this.shakeIds.clear();
+    this.selected.clear();
+    for (let i = this.slots.length - 1; i >= 0; i--) {
+      const die = this.slots[i];
+      if (this.idSlot.get(die.id) !== i) continue;
+      this.freeSlot(i, die);
     }
   }
 
@@ -942,7 +960,30 @@ export class DiceRenderer {
   }
 
   private onVisibilityChange = (): void => {
-    if (document.hidden) this.stopHaptics();
+    if (document.hidden) {
+      this.stopHaptics();
+      return;
+    }
+    this.render();
+    this.ensureLoop();
+  };
+
+  private onPageShow = (): void => {
+    this.render();
+    this.ensureLoop();
+  };
+
+  private onContextLost = (event: Event): void => {
+    event.preventDefault();
+  };
+
+  private onContextRestored = (): void => {
+    if (!this.ready) return;
+    this.rebuildInstanced();
+    this.writeAllMatrices(performance.now());
+    this.updatePlateHighlights();
+    this.render();
+    this.ensureLoop();
   };
 
   render(): void {
@@ -994,6 +1035,9 @@ export class DiceRenderer {
     if (this.rafId !== null) cancelAnimationFrame(this.rafId);
     this.resizeObserver.disconnect();
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    window.removeEventListener('pageshow', this.onPageShow);
+    this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
+    this.renderer.domElement.removeEventListener('webglcontextrestored', this.onContextRestored);
     this.stopHaptics();
     for (const mesh of this.instanced) mesh.dispose();
     this.pixelPass?.dispose();
