@@ -205,6 +205,7 @@ function dropSmallComponents(data: ImageData, keepFrac: number): void {
 }
 
 function addWhiteRing(data: ImageData, thickness: number): void {
+  if (thickness <= 0) return;
   const w = data.width;
   const h = data.height;
   const n = w * h;
