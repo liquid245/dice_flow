@@ -142,6 +142,55 @@ function makeShadowTexture(): THREE.Texture {
   return new THREE.CanvasTexture(canvas);
 }
 
+function drawGlossyPip(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  const body = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.15, cx, cy, r);
+  body.addColorStop(0, '#7a7a81');
+  body.addColorStop(0.55, '#63636a');
+  body.addColorStop(1, '#4b4b52');
+  ctx.fillStyle = body;
+  ctx.fill();
+
+  const shade = ctx.createRadialGradient(cx + r * 0.25, cy + r * 0.4, r * 0.1, cx, cy, r);
+  shade.addColorStop(0, 'rgba(0,0,0,0.28)');
+  shade.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = shade;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  const hx = cx - r * 0.42;
+  const hy = cy - r * 0.5;
+  const spec = ctx.createRadialGradient(hx, hy, 0, hx, hy, r * 0.55);
+  spec.addColorStop(0, 'rgba(255,255,255,0.95)');
+  spec.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = spec;
+  ctx.beginPath();
+  ctx.arc(hx, hy, r * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function renderFacePips(): void {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 1024;
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const step = 250;
+  const pipRadius = 118;
+  for (const x of [-1, 1]) {
+    for (const y of [-1, 0, 1]) {
+      drawGlossyPip(ctx, 512 + x * step, 512 + y * step, pipRadius);
+    }
+  }
+  (window as unknown as { __iconDone?: boolean }).__iconDone = true;
+}
+
 function main() {
   const params = new URLSearchParams(window.location.search);
   const themeName = params.get('theme') ?? 'light';
@@ -150,6 +199,11 @@ function main() {
   const radius = Math.min(Math.max(parseFloat(params.get('radius') ?? '0') || 0, 0), 0.5);
   const view = Math.max(0, Math.min(6, parseInt(params.get('view') ?? '6', 10) || 6));
   const face = parseInt(params.get('face') ?? '-1', 10);
+
+  if (themeName === 'face') {
+    renderFacePips();
+    return;
+  }
 
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
