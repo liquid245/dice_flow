@@ -26,27 +26,32 @@ export interface SelectedSummary {
   valueText: string;
 }
 
+function groupLabel(values: number[], totals?: Record<number, number>): string {
+  if (totals) {
+    const counts = new Map<number, number>();
+    for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+    const partial = Array.from(counts.keys()).some(
+      (value) => (counts.get(value) ?? 0) < (totals[value] ?? 0),
+    );
+    if (partial) {
+      const unique = Array.from(counts.keys()).sort((a, b) => a - b);
+      const lo = unique[0];
+      const hi = unique[unique.length - 1];
+      return lo === hi ? `${uiHistory.someWord} ${lo}` : `${uiHistory.someWord} ${lo}-${hi}`;
+    }
+  }
+  return valueTextFor(values);
+}
+
 export function describeSelection(dice: Die[], selection: Selection): SelectedSummary | null {
   const selectedDice = dice.filter((d) => isDieSelected(d, selection));
   if (selectedDice.length === 0) return null;
-
-  const totalByValue = new Map<number, number>();
-  const selectedByValue = new Map<number, number>();
-  for (const d of dice) totalByValue.set(d.value, (totalByValue.get(d.value) ?? 0) + 1);
-  for (const d of selectedDice) selectedByValue.set(d.value, (selectedByValue.get(d.value) ?? 0) + 1);
-
-  const partial = Array.from(selectedByValue.keys()).some(
-    (value) => (selectedByValue.get(value) ?? 0) < (totalByValue.get(value) ?? 0),
-  );
-  if (!partial) {
-    return { count: selectedDice.length, valueText: valueTextFor(selectedDice.map((d) => d.value)) };
-  }
-
-  const values = selectedDice.map((d) => d.value).sort((a, b) => a - b);
-  const lo = values[0];
-  const hi = values[values.length - 1];
-  const range = lo === hi ? `${lo}` : `${lo}-${hi}`;
-  return { count: selectedDice.length, valueText: `${uiHistory.someWord} ${range}` };
+  const totals: Record<number, number> = {};
+  for (const d of dice) totals[d.value] = (totals[d.value] ?? 0) + 1;
+  return {
+    count: selectedDice.length,
+    valueText: groupLabel(selectedDice.map((d) => d.value), totals),
+  };
 }
 
 export function formatSelectionText(summary: SelectedSummary): string {
@@ -74,29 +79,42 @@ function formatGrouped(values: number[]): string {
 
 export function formatAction(entry: HistoryEntry): string {
   const verb = uiHistory.verbs[entry.kind] ?? entry.kind;
+  const before = entry.before && entry.before.length > 0 ? entry.before : undefined;
+  const after = entry.after && entry.after.length > 0 ? entry.after : undefined;
   switch (entry.kind) {
     case 'roll':
-      return entry.after && entry.after.length > 0
-        ? `${verb} ${entry.after.length} ${uiHistory.arrow} ${formatGrouped(entry.after)}`
-        : verb;
-    case 'clear':
+      if (before && after) {
+        return `${verb} ${entry.count} ${groupLabel(before, entry.totals)} ${uiHistory.arrow} ${formatGrouped(after)}`;
+      }
+      if (after) return `${verb} ${after.length} ${uiHistory.arrow} ${formatGrouped(after)}`;
       return verb;
     case 'reroll': {
-      const before = entry.before && entry.before.length > 0 ? valueTextFor(entry.before) : '';
-      if (entry.after && entry.after.length > 0) {
-        return before
-          ? `${verb} ${entry.after.length} ${before} ${uiHistory.arrow} ${formatGrouped(entry.after)}`
-          : `${verb} ${entry.after.length} ${uiHistory.arrow} ${formatGrouped(entry.after)}`;
+      if (before && after) {
+        return `${verb} ${entry.count} ${groupLabel(before, entry.totals)} ${uiHistory.arrow} ${formatGrouped(after)}`;
       }
+      if (after) return `${verb} ${entry.count} ${uiHistory.arrow} ${formatGrouped(after)}`;
       if (entry.count > 0 && entry.value !== undefined) {
         return `${verb} ${entry.count} ${valueTextFor([entry.value])}`;
       }
       return entry.count > 0 ? `${verb} ${entry.count}` : verb;
     }
     case 'move':
+      if (before && entry.count > 0 && entry.value !== undefined) {
+        return `${verb} ${entry.count} ${groupLabel(before, entry.totals)} ${uiHistory.arrow} ${entry.value}`;
+      }
       return entry.count > 0 && entry.value !== undefined
         ? `${verb} ${entry.count} ${uiHistory.arrow} ${entry.value}`
         : verb;
+    case 'delete':
+      if (before) return `${verb} ${entry.count} ${groupLabel(before, entry.totals)}`;
+      return entry.count > 0 ? `${verb} ${entry.count}` : verb;
+    case 'add':
+      if (after && entry.count === after.length) {
+        return `${verb} ${entry.count} ${uiHistory.arrow} ${formatGrouped(after)}`;
+      }
+      return entry.count > 0 ? `${verb} ${entry.count}` : verb;
+    case 'clear':
+      return verb;
     default:
       return entry.count > 0 ? `${verb} ${entry.count}` : verb;
   }
@@ -120,7 +138,7 @@ export function buildHistoryFeed(
   if (dice.length === 0) {
     return { chunk, system: swipeHint, summary: '', rows: [], active: false };
   }
-  const rows = chunk.map((entry) => formatAction(entry));
+  const rows = chunk.slice(0, -1).map((entry) => formatAction(entry));
   const parts: string[] = [];
   const last = chunk[chunk.length - 1];
   if (last) parts.push(formatLiveAction(last));

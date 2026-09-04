@@ -4,6 +4,7 @@ import type { GameState } from './state';
 import { createInitialState, normalizeState } from './state';
 import type { EngineDeps } from './deps';
 import { reduce } from './reducer';
+import type { Die } from '../dice/types';
 import { selectedDice } from '../selection/selection';
 
 export interface GameEngine {
@@ -118,8 +119,15 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
   };
 }
 
-function selectedCount(state: GameState): number {
-  return selectedDice(state.dice, state.selection).length;
+function valueTotals(dice: Die[], values: number[]): Record<number, number> {
+  const table = new Map<number, number>();
+  for (const d of dice) table.set(d.value, (table.get(d.value) ?? 0) + 1);
+  const totals: Record<number, number> = {};
+  for (const value of new Set(values)) {
+    const total = table.get(value);
+    if (total !== undefined) totals[value] = total;
+  }
+  return totals;
 }
 
 function makeEntry(
@@ -131,35 +139,70 @@ function makeEntry(
   const base = { id: deps.nextId(), timestamp: deps.now() };
   switch (action.type) {
     case 'roll': {
-      const count = selectedCount(previous);
-      if (count === 0) return { ...base, kind: 'roll', count: 0 };
-      return { ...base, kind: 'roll', count, after: next.dice.map((d) => d.value) };
+      const affected = selectedDice(previous.dice, previous.selection);
+      if (affected.length === 0) return { ...base, kind: 'roll', count: 0 };
+      const ids = new Set(affected.map((d) => d.id));
+      const before = affected.map((d) => d.value);
+      return {
+        ...base,
+        kind: 'roll',
+        count: affected.length,
+        before,
+        totals: valueTotals(previous.dice, before),
+        after: next.dice.filter((d) => ids.has(d.id)).map((d) => d.value),
+      };
     }
     case 'reroll': {
       const selected = selectedDice(previous.dice, previous.selection);
       const targets = selected.length > 0 ? selected : previous.dice;
       if (targets.length === 0) return { ...base, kind: 'reroll', count: 0, before: [], after: [] };
       const ids = new Set(targets.map((d) => d.id));
-      const values = new Set(targets.map((d) => d.value));
+      const before = targets.map((d) => d.value);
+      const values = new Set(before);
       return {
         ...base,
         kind: 'reroll',
         count: targets.length,
         value: values.size === 1 ? targets[0].value : undefined,
-        before: targets.map((d) => d.value),
+        before,
+        totals: valueTotals(previous.dice, before),
         after: next.dice.filter((d) => ids.has(d.id)).map((d) => d.value),
       };
     }
     case 'add':
-      return { ...base, kind: 'add', count: action.count };
+      return {
+        ...base,
+        kind: 'add',
+        count: action.count,
+        after: next.dice.slice(previous.dice.length).map((d) => d.value),
+      };
     case 'delete': {
       const selected = selectedDice(previous.dice, previous.selection);
-      const count =
-        selected.length > 0 ? selected.length : Math.min(Math.max(0, action.count ?? 1), previous.dice.length);
-      return { ...base, kind: 'delete', count };
+      const removed =
+        selected.length > 0
+          ? selected
+          : previous.dice.slice(-Math.min(Math.max(0, action.count ?? 1), previous.dice.length));
+      const before = removed.map((d) => d.value);
+      return {
+        ...base,
+        kind: 'delete',
+        count: removed.length,
+        before,
+        totals: valueTotals(previous.dice, before),
+      };
     }
-    case 'move':
-      return { ...base, kind: 'move', count: selectedCount(previous), value: action.targetValue };
+    case 'move': {
+      const affected = selectedDice(previous.dice, previous.selection);
+      const before = affected.map((d) => d.value);
+      return {
+        ...base,
+        kind: 'move',
+        count: affected.length,
+        value: action.targetValue,
+        before,
+        totals: valueTotals(previous.dice, before),
+      };
+    }
     case 'clear':
       return { ...base, kind: 'clear', count: previous.dice.length };
   }
@@ -181,6 +224,11 @@ function mergeModEntry(state: GameState, entry: HistoryEntry): GameState {
   if (net === 0) {
     return { ...state, history: history.slice(0, -1) };
   }
-  const merged: HistoryEntry = { ...last, kind: net > 0 ? 'add' : 'delete', count: Math.abs(net) };
+  const merged: HistoryEntry = {
+    id: last.id,
+    timestamp: last.timestamp,
+    kind: net > 0 ? 'add' : 'delete',
+    count: Math.abs(net),
+  };
   return { ...state, history: [...history.slice(0, -1), merged] };
 }

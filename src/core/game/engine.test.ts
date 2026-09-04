@@ -56,6 +56,69 @@ describe('engine', () => {
     expect(last).toMatchObject({ kind: 'roll', count: 2, after: [1, 1] });
   });
 
+  it('records only the rolled dice and their totals when a subset is rolled', () => {
+    const engine = createEngine(makeDeps());
+    engine.dispatch({ type: 'add', count: 6, values: [6, 6, 5, 5, 4, 4] });
+    engine.dispatch({ type: 'select', ids: ['d2', 'd4', 'd6'], mode: 'set' });
+    engine.dispatch({ type: 'roll' });
+    const last = engine.getState().history[engine.getState().history.length - 1];
+    expect(last).toMatchObject({
+      kind: 'roll',
+      count: 3,
+      before: [6, 5, 4],
+      totals: { 6: 2, 5: 2, 4: 2 },
+      after: [1, 1, 1],
+    });
+  });
+
+  it('records the values removed by a selected delete', () => {
+    const engine = createEngine(makeDeps());
+    engine.dispatch({ type: 'add', count: 4, values: [6, 6, 5, 5] });
+    engine.dispatch({ type: 'select', ids: ['d1'], mode: 'set' });
+    engine.dispatch({ type: 'move', targetValue: 6 });
+    engine.dispatch({ type: 'select', ids: ['d3', 'd4'], mode: 'set' });
+    engine.dispatch({ type: 'delete' });
+    const last = engine.getState().history[engine.getState().history.length - 1];
+    expect(last).toMatchObject({ kind: 'delete', count: 2, before: [5, 5], totals: { 5: 2 } });
+  });
+
+  it('records the values removed from the tail when nothing is selected', () => {
+    const engine = createEngine(makeDeps());
+    engine.dispatch({ type: 'add', count: 4, values: [1, 2, 3, 4] });
+    engine.dispatch({ type: 'select', ids: ['d1'], mode: 'set' });
+    engine.dispatch({ type: 'move', targetValue: 1 });
+    engine.dispatch({ type: 'delete', count: 2 });
+    const last = engine.getState().history[engine.getState().history.length - 1];
+    expect(last).toMatchObject({ kind: 'delete', count: 2, before: [3, 4], totals: { 3: 1, 4: 1 } });
+  });
+
+  it('records the moved dice values and their totals', () => {
+    const engine = createEngine(makeDeps());
+    engine.dispatch({ type: 'add', count: 4, values: [6, 6, 5, 5] });
+    engine.dispatch({ type: 'select', ids: ['d1', 'd2'], mode: 'set' });
+    engine.dispatch({ type: 'move', targetValue: 4 });
+    const last = engine.getState().history[engine.getState().history.length - 1];
+    expect(last).toMatchObject({ kind: 'move', count: 2, value: 4, before: [6, 6], totals: { 6: 2 } });
+  });
+
+  it('stores the values of added dice in the add entry', () => {
+    const engine = createEngine(makeDeps());
+    engine.dispatch({ type: 'add', count: 2, values: [6, 3] });
+    const last = engine.getState().history[engine.getState().history.length - 1];
+    expect(last).toMatchObject({ kind: 'add', count: 2, after: [6, 3] });
+  });
+
+  it('drops stored dice values when modifications are netted', () => {
+    const engine = createEngine(makeDeps());
+    engine.dispatch({ type: 'add', count: 1, values: [6] });
+    engine.dispatch({ type: 'add', count: 1 });
+    const last = engine.getState().history[engine.getState().history.length - 1];
+    expect(last).toMatchObject({ kind: 'add', count: 2 });
+    expect(last.after).toBeUndefined();
+    expect(last.before).toBeUndefined();
+    expect(last.totals).toBeUndefined();
+  });
+
   it('undoes and redoes every action, excluding selection', () => {
     const engine = createEngine(makeDeps());
     engine.dispatch({ type: 'add', count: 2 });

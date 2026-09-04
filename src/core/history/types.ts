@@ -8,4 +8,5 @@ export interface HistoryEntry {
   value?: number;
   before?: number[];
   after?: number[];
+  totals?: Record<number, number>;
 }

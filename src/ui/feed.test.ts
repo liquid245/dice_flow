@@ -86,6 +86,28 @@ describe('formatAction', () => {
     expect(formatAction(entry('roll', 20))).toBe('Roll');
   });
 
+  it('formats roll of a full group with affected dice', () => {
+    expect(formatAction({ ...entry('roll', 2), before: [6, 6], totals: { 6: 2 }, after: [3, 1] })).toBe(
+      'Roll 2 6+ → 3, 1',
+    );
+  });
+
+  it('formats roll of a partial group as Some of', () => {
+    expect(formatAction({ ...entry('roll', 3), before: [5, 5, 4], totals: { 5: 2, 4: 2 }, after: [6, 1, 1] })).toBe(
+      'Roll 3 Some of 4-5 → 6, 1×2',
+    );
+  });
+
+  it('formats roll of a partially taken single group', () => {
+    expect(formatAction({ ...entry('roll', 2), before: [6, 6], totals: { 6: 4 }, after: [3, 1] })).toBe(
+      'Roll 2 Some of 6 → 3, 1',
+    );
+  });
+
+  it('falls back to value compression when totals are missing', () => {
+    expect(formatAction({ ...entry('roll', 2), before: [6, 6], after: [3, 1] })).toBe('Roll 2 6+ → 3, 1');
+  });
+
   it('formats reroll with before and after', () => {
     expect(formatAction({ ...entry('reroll', 4, 6), before: [6, 6, 6, 6], after: [6, 6, 5, 3] })).toBe(
       'Reroll 4 6+ → 6×2, 5, 3',
@@ -112,8 +134,22 @@ describe('formatAction', () => {
     expect(formatAction(entry('delete', 3))).toBe('Remove 3');
   });
 
+  it('formats delete with removed values', () => {
+    expect(formatAction({ ...entry('delete', 3), before: [6, 6, 5], totals: { 6: 3, 5: 2 } })).toBe(
+      'Remove 3 Some of 5-6',
+    );
+  });
+
   it('formats move with target value', () => {
     expect(formatAction(entry('move', 7, 6))).toBe('Move 7 → 6');
+  });
+
+  it('formats move with the original dice values', () => {
+    expect(formatAction({ ...entry('move', 2, 4), before: [6, 6], totals: { 6: 2 } })).toBe('Move 2 6+ → 4');
+  });
+
+  it('formats add with values', () => {
+    expect(formatAction({ ...entry('add', 5), after: [6, 6, 5, 5, 5] })).toBe('Add 5 → 6×2, 5×3');
   });
 
   it('formats clear', () => {
@@ -157,7 +193,7 @@ describe('buildHistoryFeed', () => {
     const dice = [die('a', 6), die('b', 6), die('c', 5), die('d', 5), die('e', 5)];
     const feed = buildHistoryFeed(dice, noSelection(), history, 'Swipe to add');
     expect(feed.summary).toBe('Roll 5 · Total 5');
-    expect(feed.rows).toEqual(['Roll 5 → 6×2, 5×3']);
+    expect(feed.rows).toEqual([]);
     expect(feed.active).toBe(false);
   });
 
@@ -166,7 +202,7 @@ describe('buildHistoryFeed', () => {
     const dice = [die('a', 6), die('b', 6), die('c', 5), die('d', 5), die('e', 5), die('f', 6)];
     const feed = buildHistoryFeed(dice, noSelection(), history, 'Swipe to add');
     expect(feed.summary).toBe('Add 1 · Total 6');
-    expect(feed.rows).toEqual(['Roll 5 → 6×2, 5×3', 'Add 1']);
+    expect(feed.rows).toEqual(['Roll 5 → 6×2, 5×3']);
     expect(feed.active).toBe(true);
   });
 
@@ -206,7 +242,7 @@ describe('buildHistoryFeed', () => {
     const dice = [die('a', 6), die('b', 5), die('c', 4)];
     const feed = buildHistoryFeed(dice, noSelection(), history, 'Swipe to add');
     expect(feed.active).toBe(false);
-    expect(feed.rows).toEqual(['Roll 3 → 6, 5, 4']);
+    expect(feed.rows).toEqual([]);
   });
 
   it('falls back to the latest entry when no roll exists yet', () => {
@@ -221,7 +257,7 @@ describe('buildHistoryFeed', () => {
     const history = [roll(5, [6, 5, 5, 4, 3]), { ...entry('clear', 5) } as HistoryEntry, roll(2, [6, 1])];
     const dice = [die('a', 6), die('b', 1)];
     const feed = buildHistoryFeed(dice, noSelection(), history, 'Swipe to add');
-    expect(feed.rows).toEqual(['Roll 2 → 6, 1']);
+    expect(feed.rows).toEqual([]);
     expect(feed.active).toBe(false);
   });
 });
