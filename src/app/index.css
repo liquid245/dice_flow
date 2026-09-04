@@ -73,8 +73,6 @@ body {
 
 .info-panel--expanded .info-panel-content {
   justify-content: flex-start;
-  padding-block: var(--panel-band, 0px);
-  max-height: min(50vh, 340px);
   overflow-y: auto;
   touch-action: pan-y;
   overscroll-behavior: contain;

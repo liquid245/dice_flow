@@ -102,6 +102,10 @@ export const config = {
     infoPanel: {
       centered: true,
       swipeHint: 'Swipe finger to add or reduce dices',
+      historyRows: {
+        portrait: 5,
+        landscape: 5,
+      },
     },
     statusLine: {
       // Messages that replace the version number, top = higher priority.

@@ -7,6 +7,11 @@ const MIN_FONT = 6;
 const MAX_FONT = 16;
 const LINE_HEIGHT = 20;
 
+function historyRowLimit(): number {
+  const landscape = window.matchMedia('(orientation: landscape)').matches;
+  return config.ui.infoPanel.historyRows[landscape ? 'landscape' : 'portrait'];
+}
+
 export function InfoPanel() {
   const { state } = useGame();
   const infoPanel = config.ui.infoPanel;
@@ -67,14 +72,7 @@ export function InfoPanel() {
       if (expanded) {
         contentBox.style.lineHeight = '';
         root.style.height = '';
-        const cs = getComputedStyle(root);
-        const outer =
-          parseFloat(cs.paddingTop) +
-          parseFloat(cs.paddingBottom) +
-          parseFloat(cs.borderTopWidth) +
-          parseFloat(cs.borderBottomWidth);
-        const band = Math.max(0, Math.round((collapsedHeight - outer - LINE_HEIGHT) / 2));
-        root.style.setProperty('--panel-band', `${band}px`);
+        contentBox.style.height = `${historyRowLimit() * LINE_HEIGHT}px`;
       } else {
         contentBox.style.lineHeight = singleRow ? 'normal' : '';
         root.style.height = `${collapsedHeight}px`;
