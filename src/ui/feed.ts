@@ -46,12 +46,20 @@ function groupLabel(values: number[], totals?: Record<number, number>): string {
 export function describeSelection(dice: Die[], selection: Selection): SelectedSummary | null {
   const selectedDice = dice.filter((d) => isDieSelected(d, selection));
   if (selectedDice.length === 0) return null;
-  const totals: Record<number, number> = {};
-  for (const d of dice) totals[d.value] = (totals[d.value] ?? 0) + 1;
-  return {
-    count: selectedDice.length,
-    valueText: groupLabel(selectedDice.map((d) => d.value), totals),
-  };
+  let valueText: string;
+  if (selection.kind === 'range') {
+    const groups: number[] = [];
+    for (let value = selection.min; value <= selection.max; value++) groups.push(value);
+    valueText = valueTextFor(groups);
+  } else {
+    const totals: Record<number, number> = {};
+    for (const d of dice) totals[d.value] = (totals[d.value] ?? 0) + 1;
+    valueText = groupLabel(
+      selectedDice.map((d) => d.value),
+      totals,
+    );
+  }
+  return { count: selectedDice.length, valueText };
 }
 
 export function formatSelectionText(summary: SelectedSummary): string {

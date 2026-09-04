@@ -34,6 +34,31 @@ describe('describeSelection', () => {
     expect(summary).toEqual({ count: 3, valueText: '4+' });
   });
 
+  it('labels a range selection by its groups even when a middle group is empty', () => {
+    const dice = [die('a', 6), die('b', 4), die('c', 3)];
+    const summary = describeSelection(dice, { kind: 'range', min: 4, max: 6 });
+    expect(summary).toEqual({ count: 2, valueText: '4+' });
+    expect(formatSelectionText(summary as NonNullable<typeof summary>)).toBe('Selected 2 (4+)');
+  });
+
+  it('labels a non-six range selection as lo-hi even when a middle group is empty', () => {
+    const dice = [die('a', 1), die('b', 3), die('c', 4)];
+    const summary = describeSelection(dice, { kind: 'range', min: 1, max: 3 });
+    expect(summary).toEqual({ count: 2, valueText: '1-3' });
+  });
+
+  it('labels a single top range group as X+', () => {
+    const dice = [die('a', 6), die('b', 6), die('c', 5)];
+    const summary = describeSelection(dice, { kind: 'range', min: 6, max: 6 });
+    expect(summary).toEqual({ count: 2, valueText: '6+' });
+  });
+
+  it('labels a single non-six range group with the plural suffix', () => {
+    const dice = [die('a', 5), die('b', 5), die('c', 4)];
+    const summary = describeSelection(dice, { kind: 'range', min: 5, max: 5 });
+    expect(summary).toEqual({ count: 2, valueText: '5s' });
+  });
+
   it('renders a fully selected six group as 6+', () => {
     const dice = [die('a', 6), die('b', 6), die('c', 6)];
     expect(describeSelection(dice, idsSelection(['a', 'b', 'c']))).toEqual({ count: 3, valueText: '6+' });
