@@ -28,6 +28,13 @@ describe('pickStatusMessage', () => {
     ).toBe('selection');
   });
 
+  it('prefers downloading over every other message when placed first', () => {
+    const order: readonly StatusMessageKey[] = ['downloading', 'selection', 'muted', 'ready', 'version'];
+    expect(
+      pickStatusMessage(order, { downloading: true, ready: true, muted: true, selection: true }),
+    ).toBe('downloading');
+  });
+
   it('honours the configured order when it differs', () => {
     const order: readonly StatusMessageKey[] = ['ready', 'downloading', 'muted', 'version'];
     expect(pickStatusMessage(order, { downloading: true, ready: false, muted: true, selection: false })).toBe(

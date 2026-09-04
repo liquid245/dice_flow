@@ -109,9 +109,9 @@ export const config = {
     },
     statusLine: {
       // Messages that replace the version number, top = higher priority.
-      // "selection" shows a countdown bar while dice are selected and must stay first.
+      // "downloading" is the new-version progress bar and must always stay first.
       // "version" is the always-on fallback and must normally stay last.
-      priority: ['selection', 'muted', 'ready', 'downloading', 'version'] as StatusMessageKey[],
+      priority: ['downloading', 'selection', 'muted', 'ready', 'version'] as StatusMessageKey[],
     },
     history: {
       verbs: {
