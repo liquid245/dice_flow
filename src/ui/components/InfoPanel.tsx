@@ -24,12 +24,7 @@ export function InfoPanel() {
   const contentRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const prevExpandedRef = useRef(false);
-
-  const [prevChunkKey, setPrevChunkKey] = useState(chunkKey);
-  if (prevChunkKey !== chunkKey) {
-    setPrevChunkKey(chunkKey);
-    setExpanded(false);
-  }
+  const prevChunkKeyRef = useRef(chunkKey);
 
   const collapsedText = feed.system ?? feed.summary;
 
@@ -125,12 +120,14 @@ export function InfoPanel() {
     const box = contentRef.current;
     if (!box || !expanded) {
       prevExpandedRef.current = expanded;
+      prevChunkKeyRef.current = chunkKey;
       return;
     }
     const justOpened = !prevExpandedRef.current;
-    const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 12;
-    if (justOpened || nearBottom) box.scrollTop = box.scrollHeight;
+    const newEvent = prevChunkKeyRef.current !== chunkKey;
+    if (justOpened || newEvent) box.scrollTop = box.scrollHeight;
     prevExpandedRef.current = expanded;
+    prevChunkKeyRef.current = chunkKey;
   }, [expanded, chunkKey]);
 
   const modifiers = [

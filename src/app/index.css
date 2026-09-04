@@ -76,6 +76,8 @@ body {
   padding-block: var(--panel-band, 0px);
   max-height: min(50vh, 340px);
   overflow-y: auto;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 
 .history-line {
@@ -96,6 +98,7 @@ body {
 }
 
 .history-line--expand {
+  flex-shrink: 0;
   text-align: center;
   white-space: normal;
   overflow-wrap: anywhere;
