@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { detectGuide, detectInstallMode } from './detect';
+import { detectAudioUnlock, detectGuide, detectInstallMode } from './detect';
 import { guideText } from './guideText';
 
 const IOS_SAFARI =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 const IPAD_SAFARI =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+const CR_IOS_IPHONE =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0.0.0 Mobile/15E148 Safari/604.1';
+const EDGE_IOS_IPAD =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) EdgiOS/120.0.0.0 Mobile/15E148 Safari/604.1';
 const MAC_SAFARI =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15';
 const CHROME_ANDROID =
@@ -77,5 +81,25 @@ describe('guideText', () => {
     expect(guideText('ios').length).toBeGreaterThan(0);
     expect(guideText('safari-macos').length).toBeGreaterThan(0);
     expect(guideText('firefox-android').length).toBeGreaterThan(0);
+  });
+});
+
+describe('detectAudioUnlock', () => {
+  it('returns tap for iOS Safari and iPadOS Safari', () => {
+    expect(detectAudioUnlock(IOS_SAFARI)).toBe('tap');
+    expect(detectAudioUnlock(IPAD_SAFARI)).toBe('tap');
+  });
+
+  it('returns tap for iOS Chrome and Edge', () => {
+    expect(detectAudioUnlock(CR_IOS_IPHONE)).toBe('tap');
+    expect(detectAudioUnlock(EDGE_IOS_IPAD)).toBe('tap');
+  });
+
+  it('returns any for desktop and Android browsers', () => {
+    expect(detectAudioUnlock(MAC_SAFARI)).toBe('any');
+    expect(detectAudioUnlock(CHROME_MAC)).toBe('any');
+    expect(detectAudioUnlock(FIREFOX_MAC)).toBe('any');
+    expect(detectAudioUnlock(CHROME_ANDROID)).toBe('any');
+    expect(detectAudioUnlock(FIREFOX_ANDROID)).toBe('any');
   });
 });

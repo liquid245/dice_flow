@@ -106,3 +106,67 @@ describe('audio play', () => {
     expect(audioCtx.createBufferSource).toHaveBeenCalled();
   });
 });
+
+describe('audio muted state', () => {
+  let audioCtx: MockAudioContext;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    audioCtx = new MockAudioContext();
+    vi.stubGlobal('AudioContext', function () {
+      return audioCtx;
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  async function freshAudio(): Promise<typeof import('./audio')> {
+    vi.resetModules();
+    return import('./audio');
+  }
+
+  it('is muted until a context exists and while it is suspended', async () => {
+    const { isAudioMuted, probeAudio } = await freshAudio();
+    expect(isAudioMuted()).toBe(true);
+    probeAudio();
+    expect(isAudioMuted()).toBe(true);
+    audioCtx.state = 'running';
+    expect(isAudioMuted()).toBe(false);
+  });
+
+  it('unlocks on the first gesture and notifies subscribers', async () => {
+    const handlers = new Map<string, Array<() => void>>();
+    vi.stubGlobal('window', {
+      addEventListener: vi.fn((type: string, handler: () => void) => {
+        const list = handlers.get(type) ?? [];
+        list.push(handler);
+        handlers.set(type, list);
+      }),
+    });
+
+    audioCtx.resume = vi.fn(() => {
+      audioCtx.state = 'running';
+      const onstate = (audioCtx as unknown as { onstatechange?: () => void }).onstatechange;
+      onstate?.();
+      return Promise.resolve();
+    });
+
+    const { probeAudio, unlockAudio, subscribeAudioState, isAudioMuted } = await freshAudio();
+    probeAudio();
+    const states: boolean[] = [];
+    const unsubscribe = subscribeAudioState(() => states.push(isAudioMuted()));
+
+    unlockAudio();
+    const pointerDown = handlers.get('pointerdown');
+    expect(pointerDown).toBeDefined();
+    pointerDown?.[0]();
+
+    expect(audioCtx.state).toBe('running');
+    expect(isAudioMuted()).toBe(false);
+    expect(states).toContain(false);
+    unsubscribe();
+  });
+});

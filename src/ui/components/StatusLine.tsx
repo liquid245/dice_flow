@@ -1,5 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { usePwaUpdate } from '../../app/usePwaUpdate';
+import { isAudioMuted, subscribeAudioState } from '../../services/audio';
+import { detectAudioUnlock } from '../../install/detect';
+import { config } from '../../config';
+import { pickStatusMessage, type StatusMessageActivity } from '../statusMessage';
 
 type MemoryInfo = { usedJSHeapSize: number } | undefined;
 
@@ -14,6 +18,15 @@ export function StatusLine() {
   const [fps, setFps] = useState(0);
   const [memory, setMemory] = useState<number | null>(null);
   const { status, progress } = usePwaUpdate();
+  const audioMuted = useSyncExternalStore(subscribeAudioState, isAudioMuted);
+  const unlock = detectAudioUnlock(navigator.userAgent);
+
+  const active: StatusMessageActivity = {
+    downloading: status === 'downloading',
+    ready: status === 'ready',
+    muted: unlock === 'tap' && audioMuted,
+  };
+  const message = pickStatusMessage(config.ui.statusLine.priority, active);
 
   useEffect(() => {
     if (!DEBUG) return;
@@ -43,8 +56,9 @@ export function StatusLine() {
 
   return (
     <div className="status-line">
-      {status === 'idle' && <span>{__APP_VERSION__}</span>}
-      {status === 'downloading' && (
+      {message === 'muted' && <span>Tap the screen to enable sound.</span>}
+      {message === 'version' && <span>{__APP_VERSION__}</span>}
+      {message === 'downloading' && (
         <span className="update-status">
           <span>Downloading update</span>
           <span className="update-bar">
@@ -53,7 +67,7 @@ export function StatusLine() {
           <span>{progress}%</span>
         </span>
       )}
-      {status === 'ready' && <span>New version is ready, reload the page.</span>}
+      {message === 'ready' && <span>New version is ready, reload the page.</span>}
       {DEBUG && <span> · {fps} FPS</span>}
       {DEBUG && memory !== null && <span> · {Math.round(memory / 1024 / 1024)} MB</span>}
     </div>

@@ -7,6 +7,7 @@ export type SoundName = SampleName | 'select' | 'thump';
 let ctx: AudioContext | null = null;
 const buffers = new Map<SampleName, AudioBuffer>();
 const activeSources = new Set<AudioBufferSourceNode>();
+const stateListeners = new Set<() => void>();
 let preloadStarted = false;
 let unlocked = false;
 
@@ -15,9 +16,44 @@ const STALE_MS = 500;
 const pending: Array<{ fn: () => void; at: number }> = [];
 let draining = false;
 
+function notifyState(): void {
+  for (const listener of stateListeners) listener();
+}
+
+function createContext(): AudioContext {
+  const created = new AudioContext();
+  ctx = created;
+  created.onstatechange = () => notifyState();
+  notifyState();
+  return created;
+}
+
 function context(): AudioContext {
-  if (!ctx) ctx = new AudioContext();
-  return ctx;
+  if (!ctx) createContext();
+  return ctx as AudioContext;
+}
+
+// WebAudio is muted until the browser/OS allows playback (autoplay policy).
+// Until the first user gesture the context stays "suspended" (or does not
+// exist yet), so sounds cannot be heard.
+export function isAudioMuted(): boolean {
+  return !ctx || ctx.state !== 'running';
+}
+
+export function subscribeAudioState(listener: () => void): () => void {
+  stateListeners.add(listener);
+  return () => {
+    stateListeners.delete(listener);
+  };
+}
+
+export function probeAudio(): void {
+  if (ctx) return;
+  try {
+    createContext();
+  } catch {
+    // audio unavailable; keep ctx null and treat sound as muted
+  }
 }
 
 function playWhenRunning(fn: () => void): void {
@@ -78,7 +114,7 @@ export function unlockAudio(): void {
     if (c.state === 'running') return;
     if (!recreated) {
       recreated = true;
-      ctx = new AudioContext();
+      createContext();
     }
     const cur = context();
     const buffer = cur.createBuffer(1, 1, 22050);

@@ -4,6 +4,8 @@ const base = import.meta.env.BASE_URL || '/';
 
 export type ButtonKey = 'roll' | 'reroll' | 'add' | 'delete' | 'undo' | 'redo' | 'clear';
 
+export type StatusMessageKey = 'version' | 'downloading' | 'ready' | 'muted';
+
 type ButtonLabel = ButtonKey | 'rerollAll' | 'addOne' | 'deleteLast';
 
 const buttons: Record<ButtonLabel, string> = {
@@ -116,6 +118,11 @@ export const config = {
     infoPanel: {
       centered: true,
       swipeHint: 'Swipe finger to add or reduce dices',
+    },
+    statusLine: {
+      // Messages that replace the version number, top = higher priority.
+      // "version" is the always-on fallback and must normally stay last.
+      priority: ['muted', 'ready', 'downloading', 'version'] as StatusMessageKey[],
     },
     history: {
       verbs: {
