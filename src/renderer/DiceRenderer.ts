@@ -472,7 +472,14 @@ export class DiceRenderer {
   private layoutChanged(prev: Die[], next: Die[]): boolean {
     if (prev.length !== next.length) return true;
     for (let i = 0; i < prev.length; i++) {
-      if (prev[i].id !== next[i].id || prev[i].value !== next[i].value || prev[i].origin !== next[i].origin) return true;
+      if (
+        prev[i].id !== next[i].id ||
+        prev[i].value !== next[i].value ||
+        prev[i].origin !== next[i].origin ||
+        prev[i].rev !== next[i].rev
+      ) {
+        return true;
+      }
     }
     return false;
   }
@@ -486,6 +493,7 @@ export class DiceRenderer {
         x: position?.x ?? 0,
         y: position?.y ?? 0,
         origin: die.origin,
+        rev: die.rev,
       };
     });
   }

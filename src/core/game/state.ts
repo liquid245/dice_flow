@@ -47,6 +47,7 @@ export function normalizeState(raw: GameState | LegacyState): GameState {
       type: die.type,
       value: die.value,
       origin: die.origin,
+      rev: die.rev,
     })),
     history: legacy.history ?? [],
     selection: 'selection' in raw && raw.selection && typeof (raw.selection as Selection).kind === 'string'

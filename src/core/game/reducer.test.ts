@@ -114,6 +114,13 @@ describe('roll', () => {
     const state = stateWith([die('a', 1)]);
     expect(reduce(state, { type: 'roll' }, makeDeps([]))).toBe(state);
   });
+
+  it('keeps the same value but advances rev when the roll lands on the same face', () => {
+    const state = stateWith([die('a', 3)], ids('a'));
+    const next = reduce(state, { type: 'roll' }, makeDeps([rand(3)]));
+    expect(next.dice[0].value).toBe(3);
+    expect(next.dice[0].rev).toBe(1);
+  });
 });
 
 describe('reroll', () => {
@@ -131,6 +138,16 @@ describe('reroll', () => {
     const deps = makeDeps([rand(5), rand(4), rand(6)]);
     const next = reduce(state, { type: 'reroll' }, deps);
     expect(next.dice.map((d) => d.value)).toEqual([5, 4, 6]);
+  });
+
+  it('advances rev on every reroll, even when the face is unchanged', () => {
+    const deps = makeDeps([rand(3), rand(3)]);
+    let state = stateWith([die('a', 3)]);
+    state = reduce(state, { type: 'reroll' }, deps);
+    expect(state.dice[0].value).toBe(3);
+    expect(state.dice[0].rev).toBe(1);
+    state = reduce(state, { type: 'reroll' }, deps);
+    expect(state.dice[0].rev).toBe(2);
   });
 });
 

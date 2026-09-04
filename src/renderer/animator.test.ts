@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { computeTransitions, type DieSnapshot } from './animator';
 import type { OperationKind } from '../core/dice/types';
 
-function snap(id: string, value: number, x = 0, y = 0, origin: OperationKind = 'add'): DieSnapshot {
-  return { id, value, x, y, origin };
+function snap(id: string, value: number, x = 0, y = 0, origin: OperationKind = 'add', rev?: number): DieSnapshot {
+  return { id, value, x, y, origin, rev };
 }
 
 describe('computeTransitions', () => {
@@ -43,6 +43,16 @@ describe('computeTransitions', () => {
     expect(computeTransitions([snap('a', 5, 0, 0, 'add')], [snap('a', 5, 0, 0, 'roll')])).toEqual([
       { kind: 'change', id: 'a', fromX: 0, fromY: 0, toX: 0, toY: 0, fromValue: 5, toValue: 5, origin: 'roll' },
     ]);
+  });
+
+  it('marks a repeat roll on the same value as change when the rev advanced', () => {
+    expect(computeTransitions([snap('a', 4, 0, 0, 'roll', 1)], [snap('a', 4, 0, 0, 'roll', 2)])).toEqual([
+      { kind: 'change', id: 'a', fromX: 0, fromY: 0, toX: 0, toY: 0, fromValue: 4, toValue: 4, origin: 'roll' },
+    ]);
+  });
+
+  it('does not mark a repeat roll on the same value when the rev is unchanged', () => {
+    expect(computeTransitions([snap('a', 4, 0, 0, 'roll', 2)], [snap('a', 4, 0, 0, 'roll', 2)])).toEqual([]);
   });
 
   it('handles a mix in one step', () => {

@@ -13,4 +13,5 @@ export interface Die {
   type: DiceType;
   value: number;
   origin: OperationKind;
+  rev?: number;
 }

@@ -6,6 +6,7 @@ export interface DieSnapshot {
   x: number;
   y: number;
   origin: OperationKind;
+  rev?: number;
 }
 
 export type Transition =
@@ -35,7 +36,7 @@ export function computeTransitions(prev: DieSnapshot[], next: DieSnapshot[]): Tr
       transitions.push({ kind: 'appear', id: n.id, x: n.x, y: n.y, value: n.value });
     } else if (
       p.value !== n.value ||
-      (p.origin !== n.origin && (n.origin === 'roll' || n.origin === 'reroll'))
+      ((n.origin === 'roll' || n.origin === 'reroll') && (p.origin !== n.origin || p.rev !== n.rev))
     ) {
       transitions.push({
         kind: 'change',

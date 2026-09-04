@@ -70,7 +70,7 @@ function roll(state: GameState, deps: EngineDeps): GameState {
   const ids = new Set(selected.map((d) => d.id));
   const dice: Die[] = state.dice
     .filter((d) => ids.has(d.id))
-    .map((d) => ({ ...d, value: rollD6(deps.random), origin: 'roll' as const }));
+    .map((d) => ({ ...d, value: rollD6(deps.random), origin: 'roll' as const, rev: (d.rev ?? 0) + 1 }));
   return { ...state, dice, selection: noneSelection };
 }
 
@@ -81,7 +81,9 @@ function reroll(state: GameState, deps: EngineDeps): GameState {
   );
   if (ids.size === 0) return state;
   const dice: Die[] = state.dice.map((d) =>
-    ids.has(d.id) ? { ...d, value: rollD6(deps.random), origin: 'reroll' as const } : d,
+    ids.has(d.id)
+      ? { ...d, value: rollD6(deps.random), origin: 'reroll' as const, rev: (d.rev ?? 0) + 1 }
+      : d,
   );
   return { ...state, dice, selection: noneSelection };
 }
