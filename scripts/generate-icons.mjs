@@ -38,7 +38,7 @@ function waitForServer() {
   });
 }
 
-function render(out, { theme = 'light', fill = null, view = null, face = null, radius = 0, gradTop = null, gradBottom = null, bg = null } = {}) {
+function render(out, { theme = 'light', fill = null, view = null, face = null, radius = 0, gradTop = null, gradBottom = null } = {}) {
   const params = new URLSearchParams();
   params.set('theme', theme);
   if (fill) params.set('fill', String(fill));
@@ -47,7 +47,6 @@ function render(out, { theme = 'light', fill = null, view = null, face = null, r
   if (radius > 0) params.set('radius', String(radius));
   if (gradTop !== null) params.set('gradtop', String(gradTop));
   if (gradBottom !== null) params.set('gradbot', String(gradBottom));
-  if (bg !== null) params.set('bg', bg);
   const url = `http://127.0.0.1:${port}/icon-render.html?${params}`;
   run(chrome, [
     '--headless=new',
@@ -128,7 +127,7 @@ try {
   render(iosMaster, { theme: 'glyph', fill: 1.0 });
 
   const iosTouchMaster = join(tmp, 'die-glyph-touch.png');
-  render(iosTouchMaster, { theme: 'glyph', fill: 1.0, gradTop: 140, gradBottom: 20, bg: 'white' });
+  render(iosTouchMaster, { theme: 'glyph', fill: 1.0, gradTop: 140, gradBottom: 20 });
 
   if (target === 'probe') {
     const probes = [];
