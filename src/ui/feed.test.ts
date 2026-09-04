@@ -25,7 +25,7 @@ describe('describeSelection', () => {
     const dice = [die('a', 6), die('b', 6), die('c', 5), die('d', 4)];
     const summary = describeSelection(dice, idsSelection(['a', 'b', 'c', 'd']));
     expect(summary).toEqual({ count: 4, valueText: '4+' });
-    expect(formatSelectionText(summary as NonNullable<typeof summary>)).toBe('Sel 4 (4+)');
+    expect(formatSelectionText(summary as NonNullable<typeof summary>)).toBe('Selected 4 (4+)');
   });
 
   it('uses range selection kind', () => {
@@ -104,8 +104,12 @@ describe('buildHistoryFeed', () => {
     return { ...entry('roll', count), after: values };
   }
 
+  function noSelection(): Selection {
+    return { kind: 'none' };
+  }
+
   it('shows the swipe hint when there are no dice', () => {
-    const feed = buildHistoryFeed([], [roll(5, [6, 6, 5, 5, 5])], 'Swipe to add');
+    const feed = buildHistoryFeed([], noSelection(), [roll(5, [6, 6, 5, 5, 5])], 'Swipe to add');
     expect(feed.system).toBe('Swipe to add');
     expect(feed.summary).toBe('');
     expect(feed.rows).toEqual([]);
@@ -113,51 +117,88 @@ describe('buildHistoryFeed', () => {
   });
 
   it('shows the dice count when dice exist but the chunk is empty', () => {
-    const feed = buildHistoryFeed([die('a', 6), die('b', 5), die('c', 4)], [], 'Swipe to add');
+    const feed = buildHistoryFeed([die('a', 6), die('b', 5), die('c', 4)], noSelection(), [], 'Swipe to add');
     expect(feed.system).toBeNull();
-    expect(feed.summary).toBe('3 dice');
+    expect(feed.summary).toBe('Total 3');
     expect(feed.rows).toEqual([]);
     expect(feed.active).toBe(false);
   });
 
-  it('builds a single summary from the last roll', () => {
-    const history = [roll(5, [6, 6, 5, 5, 5]), { ...entry('add', 1), count: 1 } as HistoryEntry];
+  it('shows the total on the empty chunk together with a live selection', () => {
+    const dice = [die('a', 6), die('b', 6), die('c', 5)];
+    const feed = buildHistoryFeed(dice, idsSelection(['a', 'b']), [], 'Swipe to add');
+    expect(feed.summary).toBe('Total 3 · Selected 2 (6+)');
+  });
+
+  it('builds a single summary from a roll without value listing', () => {
+    const history = [roll(5, [6, 6, 5, 5, 5])];
+    const dice = [die('a', 6), die('b', 6), die('c', 5), die('d', 5), die('e', 5)];
+    const feed = buildHistoryFeed(dice, noSelection(), history, 'Swipe to add');
+    expect(feed.summary).toBe('Roll 5 · Total 5');
+    expect(feed.rows).toEqual(['Roll 5 → 6×2, 5×3']);
+    expect(feed.active).toBe(false);
+  });
+
+  it('uses the latest action of the chunk, not the last roll', () => {
+    const history = [roll(5, [6, 6, 5, 5, 5]), { ...entry('add', 1) } as HistoryEntry];
     const dice = [die('a', 6), die('b', 6), die('c', 5), die('d', 5), die('e', 5), die('f', 6)];
-    const feed = buildHistoryFeed(dice, history, 'Swipe to add');
-    expect(feed.system).toBeNull();
-    expect(feed.summary).toBe('Roll 5 → 6×2, 5×3 · 6 dice');
+    const feed = buildHistoryFeed(dice, noSelection(), history, 'Swipe to add');
+    expect(feed.summary).toBe('Add 1 · Total 6');
     expect(feed.rows).toEqual(['Roll 5 → 6×2, 5×3', 'Add 1']);
     expect(feed.active).toBe(true);
   });
 
-  it('keeps the last roll on view after later add/move entries', () => {
+  it('updates the summary with a move after a roll', () => {
+    const history = [
+      roll(3, [6, 5, 4]),
+      { ...entry('move', 1, 6) } as HistoryEntry,
+    ];
+    const dice = [die('a', 6), die('b', 5), die('c', 4)];
+    const feed = buildHistoryFeed(dice, noSelection(), history, 'Swipe to add');
+    expect(feed.summary).toBe('Move 1 · Total 3');
+  });
+
+  it('appends a live selection segment to the latest action', () => {
     const history = [roll(5, [6, 6, 5, 5, 5]), { ...entry('add', 1) } as HistoryEntry];
-    const dice = [die('a', 6), die('b', 6), die('c', 5), die('d', 5), die('e', 5), die('f', 4)];
-    const feed = buildHistoryFeed(dice, history, 'Swipe to add');
-    expect(feed.summary).toBe('Roll 5 → 6×2, 5×3 · 6 dice');
+    const dice = [die('a', 6), die('b', 5), die('c', 4), die('d', 3), die('e', 2), die('f', 1)];
+    const feed = buildHistoryFeed(dice, idsSelection(['a', 'b', 'c']), history, 'Swipe to add');
+    expect(feed.summary).toBe('Add 1 · Total 6 · Selected 3 (4+)');
+  });
+
+  it('omits the selection segment when nothing is selected', () => {
+    const history = [{ ...entry('reroll', 4, 6), before: [6, 6, 6, 6], after: [6, 6, 5, 3] }];
+    const dice = [die('a', 6), die('b', 6), die('c', 5), die('d', 3)];
+    const feed = buildHistoryFeed(dice, noSelection(), history, 'Swipe to add');
+    expect(feed.summary).toBe('Reroll 4 · Total 4');
+  });
+
+  it('shows the delete verb from the live entry', () => {
+    const history = [{ ...entry('delete', 2) } as HistoryEntry];
+    const dice = [die('a', 6), die('b', 5), die('c', 4)];
+    const feed = buildHistoryFeed(dice, noSelection(), history, 'Swipe to add');
+    expect(feed.summary).toBe('Remove 2 · Total 3');
   });
 
   it('is inactive with a single entry', () => {
     const history = [roll(3, [6, 5, 4])];
     const dice = [die('a', 6), die('b', 5), die('c', 4)];
-    const feed = buildHistoryFeed(dice, history, 'Swipe to add');
+    const feed = buildHistoryFeed(dice, noSelection(), history, 'Swipe to add');
     expect(feed.active).toBe(false);
-    expect(feed.summary).toBe('Roll 3 → 6, 5, 4 · 3 dice');
     expect(feed.rows).toEqual(['Roll 3 → 6, 5, 4']);
   });
 
   it('falls back to the latest entry when no roll exists yet', () => {
     const history = [{ ...entry('add', 3) } as HistoryEntry];
     const dice = [die('a', 1), die('b', 2), die('c', 3)];
-    const feed = buildHistoryFeed(dice, history, 'Swipe to add');
-    expect(feed.summary).toBe('Add 3 · 3 dice');
+    const feed = buildHistoryFeed(dice, noSelection(), history, 'Swipe to add');
+    expect(feed.summary).toBe('Add 3 · Total 3');
     expect(feed.active).toBe(false);
   });
 
   it('slices history by clear and hides the clear marker', () => {
     const history = [roll(5, [6, 5, 5, 4, 3]), { ...entry('clear', 5) } as HistoryEntry, roll(2, [6, 1])];
     const dice = [die('a', 6), die('b', 1)];
-    const feed = buildHistoryFeed(dice, history, 'Swipe to add');
+    const feed = buildHistoryFeed(dice, noSelection(), history, 'Swipe to add');
     expect(feed.rows).toEqual(['Roll 2 → 6, 1']);
     expect(feed.active).toBe(false);
   });

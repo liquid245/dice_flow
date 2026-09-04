@@ -36,6 +36,12 @@ export function formatSelectionText(summary: SelectedSummary): string {
   return `${uiHistory.selectWord} ${summary.count} (${summary.valueText})`;
 }
 
+function formatLiveAction(entry: HistoryEntry): string {
+  const verb = uiHistory.verbs[entry.kind] ?? entry.kind;
+  if (entry.kind === 'clear') return verb;
+  return entry.count > 0 ? `${verb} ${entry.count}` : verb;
+}
+
 function formatGrouped(values: number[]): string {
   const counts = new Map<number, number>();
   for (const value of values) {
@@ -79,13 +85,6 @@ export function formatAction(entry: HistoryEntry): string {
   }
 }
 
-function lastRollRerollIndex(chunk: HistoryEntry[]): number {
-  for (let i = chunk.length - 1; i >= 0; i--) {
-    if (chunk[i].kind === 'roll' || chunk[i].kind === 'reroll') return i;
-  }
-  return -1;
-}
-
 export interface HistoryFeed {
   chunk: HistoryEntry[];
   system: string | null;
@@ -94,18 +93,23 @@ export interface HistoryFeed {
   active: boolean;
 }
 
-export function buildHistoryFeed(dice: Die[], history: HistoryEntry[], swipeHint: string): HistoryFeed {
+export function buildHistoryFeed(
+  dice: Die[],
+  selection: Selection,
+  history: HistoryEntry[],
+  swipeHint: string,
+): HistoryFeed {
   const chunk = currentChunk(history);
   if (dice.length === 0) {
     return { chunk, system: swipeHint, summary: '', rows: [], active: false };
   }
   const rows = chunk.map((entry) => formatAction(entry));
-  const total = `${dice.length} ${uiHistory.diceWord}`;
-  if (rows.length === 0) {
-    return { chunk, system: null, summary: total, rows, active: false };
-  }
-  const rollIndex = lastRollRerollIndex(chunk);
-  const index = rollIndex >= 0 ? rollIndex : chunk.length - 1;
-  const summary = `${rows[index]}${uiHistory.segmentSep}${total}`;
+  const parts: string[] = [];
+  const last = chunk[chunk.length - 1];
+  if (last) parts.push(formatLiveAction(last));
+  parts.push(`${uiHistory.totalWord} ${dice.length}`);
+  const selected = describeSelection(dice, selection);
+  if (selected) parts.push(formatSelectionText(selected));
+  const summary = parts.join(uiHistory.segmentSep);
   return { chunk, system: null, summary, rows, active: chunk.length > 1 };
 }

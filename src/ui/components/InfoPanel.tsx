@@ -11,8 +11,8 @@ export function InfoPanel() {
   const infoPanel = config.ui.infoPanel;
 
   const feed = useMemo(
-    () => buildHistoryFeed(state.dice, state.history, infoPanel.swipeHint),
-    [state.dice, state.history, infoPanel.swipeHint],
+    () => buildHistoryFeed(state.dice, state.selection, state.history, infoPanel.swipeHint),
+    [state.dice, state.selection, state.history, infoPanel.swipeHint],
   );
 
   const chunkKey = useMemo(() => feed.chunk.map((entry) => entry.id).join('\n'), [feed.chunk]);
@@ -56,6 +56,11 @@ export function InfoPanel() {
         gap = Number.isFinite(cg) ? cg : Number.isFinite(rg) ? rg : 8;
       }
       root.style.width = `${Math.ceil(rect.width * 3 + gap * 2)}px`;
+      if (expanded) {
+        root.style.height = '';
+      } else {
+        root.style.height = `${Math.ceil(rect.height * 2 + gap)}px`;
+      }
     };
 
     const fit = () => {
