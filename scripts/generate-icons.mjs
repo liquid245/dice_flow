@@ -121,8 +121,8 @@ try {
   render(masters.dark.master, { theme: 'dark', radius });
   render(masters.dark.maskable, { theme: 'dark', fill: 0.78 });
 
-  const iosMaster = join(tmp, 'die-alpha.png');
-  render(iosMaster, { theme: 'alpha', fill: 0.85 });
+  const iosMaster = join(tmp, 'die-glyph.png');
+  render(iosMaster, { theme: 'glyph', fill: 0.78 });
 
   if (target === 'probe') {
     const probes = [];

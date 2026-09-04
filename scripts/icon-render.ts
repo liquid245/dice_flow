@@ -43,7 +43,7 @@ const THEMES: Record<string, ThemeConfig> = {
     ambient: 0.6,
     key: 2,
   },
-  alpha: {
+  glyph: {
     body: null,
     pips: null,
     roughness: null,
@@ -142,79 +142,6 @@ function makeShadowTexture(): THREE.Texture {
   return new THREE.CanvasTexture(canvas);
 }
 
-const BODY_ALPHA = 180;interface CanvasCopy {
-  img: ImageData;
-}
-
-function copyCanvas(src: HTMLCanvasElement): CanvasCopy | null {
-  const layer = document.createElement('canvas');
-  layer.width = src.width;
-  layer.height = src.height;
-  const ctx = layer.getContext('2d');
-  if (!ctx) return null;
-  ctx.drawImage(src, 0, 0);
-  return { img: ctx.getImageData(0, 0, src.width, src.height) };
-}
-
-function composeAlphaBody(body: ImageData, pips: ImageData): ImageData {
-  const n = body.width * body.height;
-  const out = new ImageData(body.width, body.height);
-  const b = body.data;
-  const p = pips.data;
-  const o = out.data;
-  for (let i = 0; i < n; i++) {
-    const j = i * 4;
-    const baseAlpha = b[j + 3];
-    if (baseAlpha <= 8) continue;
-    o[j] = b[j];
-    o[j + 1] = b[j + 1];
-    o[j + 2] = b[j + 2];
-    if (p[j + 3] > 24) {
-      o[j + 3] = 255;
-    } else {
-      o[j + 3] = Math.round((baseAlpha / 255) * BODY_ALPHA);
-    }
-  }
-  return out;
-}
-
-function renderAlphaIcon(
-  canvas: HTMLCanvasElement,
-  renderer: THREE.WebGLRenderer,
-  scene: THREE.Scene,
-  camera: THREE.OrthographicCamera,
-  group: THREE.Group,
-  groups: LodGroup[],
-): void {
-  renderer.render(scene, camera);
-  const passA = copyCanvas(canvas);
-  if (!passA) return;
-
-  const children = group.children as THREE.Mesh[];
-  for (let i = 0; i < children.length; i++) {
-    if (isPips(groups[i].material)) {
-      children[i].material = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    } else {
-      children[i].visible = false;
-    }
-  }
-
-  renderer.render(scene, camera);
-  const passB = copyCanvas(canvas);
-  if (!passB) return;
-
-  const composed = composeAlphaBody(passA.img, passB.img);
-  canvas.remove();
-  const layer = document.createElement('canvas');
-  layer.width = canvas.width;
-  layer.height = canvas.height;
-  const ctx = layer.getContext('2d');
-  if (!ctx) return;
-  ctx.putImageData(composed, 0, 0);
-  document.body.appendChild(layer);
-  (window as unknown as { __iconDone?: boolean }).__iconDone = true;
-}
-
 function main() {
   const params = new URLSearchParams(window.location.search);
   const themeName = params.get('theme') ?? 'light';
@@ -298,11 +225,6 @@ function main() {
       camera.top = half;
       camera.bottom = -half;
       camera.updateProjectionMatrix();
-
-      if (themeName === 'alpha') {
-        renderAlphaIcon(canvas, renderer, scene, camera, group, groups);
-        return;
-      }
 
       if (theme.shadowOpacity > 0) {
         const shadow = new THREE.Mesh(
