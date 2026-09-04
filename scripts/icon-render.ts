@@ -43,17 +43,6 @@ const THEMES: Record<string, ThemeConfig> = {
     ambient: 0.6,
     key: 2,
   },
-  glyph: {
-    body: null,
-    pips: null,
-    roughness: null,
-    envIntensity: 1.2,
-    background: null,
-    flat: false,
-    shadowOpacity: 0,
-    ambient: 0.7,
-    key: 1.8,
-  },
 };
 
 function mergeByMaterial(scene: THREE.Object3D): LodGroup[] {
@@ -142,53 +131,87 @@ function makeShadowTexture(): THREE.Texture {
   return new THREE.CanvasTexture(canvas);
 }
 
-function drawGlossyPip(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  const body = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.15, cx, cy, r);
-  body.addColorStop(0, '#7a7a81');
-  body.addColorStop(0.55, '#63636a');
-  body.addColorStop(1, '#4b4b52');
-  ctx.fillStyle = body;
-  ctx.fill();
-
-  const shade = ctx.createRadialGradient(cx + r * 0.25, cy + r * 0.4, r * 0.1, cx, cy, r);
-  shade.addColorStop(0, 'rgba(0,0,0,0.28)');
-  shade.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = shade;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
-
-  const hx = cx - r * 0.42;
-  const hy = cy - r * 0.5;
-  const spec = ctx.createRadialGradient(hx, hy, 0, hx, hy, r * 0.55);
-  spec.addColorStop(0, 'rgba(255,255,255,0.95)');
-  spec.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = spec;
-  ctx.beginPath();
-  ctx.arc(hx, hy, r * 0.55, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+function isBodyGreen(r: number, g: number, b: number): boolean {
+  return g > 60 && g > r * 1.5 && g > b * 1.5;
 }
 
-function renderFacePips(): void {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 1024;
-  document.body.appendChild(canvas);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+const RING_RADIUS = 9;
+const RING_COLOR: readonly [number, number, number] = [0x70, 0x70, 0x77];
 
-  const step = 250;
-  const pipRadius = 118;
-  for (const x of [-1, 1]) {
-    for (const y of [-1, 0, 1]) {
-      drawGlossyPip(ctx, 512 + x * step, 512 + y * step, pipRadius);
+function finalizeCutout(src: HTMLCanvasElement): void {
+  const w = src.width;
+  const h = src.height;
+  const n = w * h;
+
+  const layer = document.createElement('canvas');
+  layer.width = w;
+  layer.height = h;
+  const lctx = layer.getContext('2d');
+  if (!lctx) return;
+  lctx.drawImage(src, 0, 0);
+  const img = lctx.getImageData(0, 0, w, h);
+  const d = img.data;
+
+  const mask = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    if (d[i * 4 + 3] > 24) mask[i] = 1;
+  }
+
+  for (let i = 0; i < n; i++) {
+    const j = i * 4;
+    if (mask[i] && isBodyGreen(d[j], d[j + 1], d[j + 2])) {
+      d[j] = 0;
+      d[j + 1] = 0;
+      d[j + 2] = 0;
+      d[j + 3] = 0;
     }
   }
-  (window as unknown as { __iconDone?: boolean }).__iconDone = true;
+
+  const ring = new Uint8Array(n);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      if (!mask[i]) continue;
+      if (mask[i - 1] === 0 || mask[i + 1] === 0 || mask[i - w] === 0 || mask[i + w] === 0) ring[i] = 1;
+    }
+  }
+
+  let ringPixels = ring;
+  for (let k = 0; k < RING_RADIUS; k++) {
+    const next = new Uint8Array(ringPixels);
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x;
+        if (ringPixels[i]) continue;
+        if (
+          ringPixels[i - 1] ||
+          ringPixels[i + 1] ||
+          ringPixels[i - w] ||
+          ringPixels[i + w] ||
+          ringPixels[i - w - 1] ||
+          ringPixels[i - w + 1] ||
+          ringPixels[i + w - 1] ||
+          ringPixels[i + w + 1]
+        ) {
+          next[i] = 1;
+        }
+      }
+    }
+    ringPixels = next;
+  }
+
+  for (let i = 0; i < n; i++) {
+    if (ringPixels[i]) {
+      d[i * 4] = RING_COLOR[0];
+      d[i * 4 + 1] = RING_COLOR[1];
+      d[i * 4 + 2] = RING_COLOR[2];
+      d[i * 4 + 3] = 255;
+    }
+  }
+
+  lctx.putImageData(img, 0, 0);
+  src.remove();
+  document.body.appendChild(layer);
 }
 
 function main() {
@@ -199,11 +222,6 @@ function main() {
   const radius = Math.min(Math.max(parseFloat(params.get('radius') ?? '0') || 0, 0), 0.5);
   const view = Math.max(0, Math.min(6, parseInt(params.get('view') ?? '6', 10) || 6));
   const face = parseInt(params.get('face') ?? '-1', 10);
-
-  if (themeName === 'face') {
-    renderFacePips();
-    return;
-  }
 
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
@@ -264,7 +282,14 @@ function main() {
   loader.loadAsync('./dice-2.glb').then(
     (gltf) => {
       const groups = mergeByMaterial(gltf.scene);
-      const materials = buildMaterials(groups, theme);
+      const materials =
+        themeName === 'cutout'
+          ? groups.map((group) =>
+              isPips(group.material)
+                ? new THREE.MeshStandardMaterial({ color: 0x74747c, roughness: 0.25, metalness: 0.03, envMapIntensity: 1.8 })
+                : new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+            )
+          : buildMaterials(groups, theme);
       for (let i = 0; i < groups.length; i++) {
         group.add(new THREE.Mesh(groups[i].geometry, materials[i]));
       }
@@ -280,7 +305,7 @@ function main() {
       camera.bottom = -half;
       camera.updateProjectionMatrix();
 
-      if (theme.shadowOpacity > 0) {
+      if (theme.shadowOpacity > 0 && themeName !== 'cutout') {
         const shadow = new THREE.Mesh(
           new THREE.PlaneGeometry(1, 1),
           new THREE.MeshBasicMaterial({
@@ -296,6 +321,9 @@ function main() {
       }
 
       renderer.render(scene, camera);
+      if (themeName === 'cutout') {
+        finalizeCutout(canvas);
+      }
       (window as unknown as { __iconDone?: boolean }).__iconDone = true;
     },
     (error) => reportError('parse: ' + String(error)),
