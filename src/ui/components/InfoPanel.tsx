@@ -5,6 +5,7 @@ import { buildHistoryFeed } from '../feed';
 
 const MIN_FONT = 6;
 const MAX_FONT = 16;
+const LINE_HEIGHT = 20;
 
 export function InfoPanel() {
   const { state } = useGame();
@@ -22,6 +23,7 @@ export function InfoPanel() {
   const rootRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
+  const prevExpandedRef = useRef(false);
 
   const [prevChunkKey, setPrevChunkKey] = useState(chunkKey);
   if (prevChunkKey !== chunkKey) {
@@ -56,10 +58,20 @@ export function InfoPanel() {
         gap = Number.isFinite(cg) ? cg : Number.isFinite(rg) ? rg : 8;
       }
       root.style.width = `${Math.ceil(rect.width * 3 + gap * 2)}px`;
+      const collapsedHeight = Math.ceil(rect.height * 2 + gap);
       if (expanded) {
         root.style.height = '';
+        const cs = getComputedStyle(root);
+        const outer =
+          parseFloat(cs.paddingTop) +
+          parseFloat(cs.paddingBottom) +
+          parseFloat(cs.borderTopWidth) +
+          parseFloat(cs.borderBottomWidth);
+        const band = Math.max(0, Math.round((collapsedHeight - outer - LINE_HEIGHT) / 2));
+        root.style.setProperty('--panel-band', `${band}px`);
       } else {
-        root.style.height = `${Math.ceil(rect.height * 2 + gap)}px`;
+        root.style.height = `${collapsedHeight}px`;
+        root.style.setProperty('--panel-band', '0px');
       }
     };
 
@@ -88,6 +100,18 @@ export function InfoPanel() {
     return () => observer.disconnect();
   }, [feed.summary, feed.system, expanded]);
 
+  useLayoutEffect(() => {
+    const box = contentRef.current;
+    if (!box || !expanded) {
+      prevExpandedRef.current = expanded;
+      return;
+    }
+    const justOpened = !prevExpandedRef.current;
+    const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 12;
+    if (justOpened || nearBottom) box.scrollTop = box.scrollHeight;
+    prevExpandedRef.current = expanded;
+  }, [expanded, chunkKey]);
+
   const modifiers = [
     feed.active ? 'info-panel--active' : '',
     expanded ? 'info-panel--expanded' : '',
@@ -110,11 +134,16 @@ export function InfoPanel() {
         style={{ fontSize: `calc(var(--font-scale) * ${fontSize}px)` }}
       >
         {expanded ? (
-          feed.rows.map((row, i) => (
-            <div key={i} className="history-line history-line--expand">
-              {row}
+          <>
+            {feed.rows.map((row, i) => (
+              <div key={i} className="history-line history-line--expand">
+                {row}
+              </div>
+            ))}
+            <div className="history-line history-line--expand history-line--live">
+              {collapsedText}
             </div>
-          ))
+          </>
         ) : (
           <div
             className={`history-line history-line--center${feed.system ? ' history-line--wrap' : ''}`}

@@ -49,6 +49,7 @@ body {
   pointer-events: none;
   cursor: default;
   touch-action: none;
+  --panel-band: 0px;
 }
 
 .info-panel--active {
@@ -72,6 +73,7 @@ body {
 
 .info-panel--expanded .info-panel-content {
   justify-content: flex-start;
+  padding-block: var(--panel-band, 0px);
   max-height: min(50vh, 340px);
   overflow-y: auto;
 }
@@ -94,7 +96,7 @@ body {
 }
 
 .history-line--expand {
-  text-align: left;
+  text-align: center;
   white-space: normal;
   overflow-wrap: anywhere;
   text-overflow: clip;
