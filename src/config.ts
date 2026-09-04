@@ -2,33 +2,18 @@ type DiceFaceRotation = [number, number, number];
 
 const base = import.meta.env.BASE_URL || '/';
 
-export type ButtonKey = 'roll' | 'reroll' | 'add' | 'delete' | 'undo' | 'redo' | 'clear';
-
 export type StatusMessageKey = 'version' | 'downloading' | 'ready' | 'muted';
 
-type ButtonLabel = ButtonKey | 'rerollAll' | 'addOne' | 'deleteLast';
+type Label = string | ((selectedCount: number) => string);
 
-const buttons: Record<ButtonLabel, string> = {
-  roll: 'Roll',
-  reroll: 'Reroll',
-  rerollAll: 'Reroll All',
-  add: 'Add',
-  addOne: 'Add One',
-  delete: 'Delete',
-  deleteLast: 'Delete Last',
+const buttons: Record<'roll' | 'reroll' | 'add' | 'delete' | 'undo' | 'redo' | 'clear', Label> = {
+  roll: 'Roll Selected',
+  reroll: (n) => (n > 0 ? 'Reroll Selected' : 'Reroll All'),
+  add: (n) => (n === 0 ? 'Add One Die' : `Add ${n} ${n === 1 ? 'Die' : 'Dice'}`),
+  delete: (n) => (n > 0 ? 'Delete Selected' : 'Delete Last'),
   undo: 'Undo',
   redo: 'Redo',
-  clear: 'Clear',
-};
-
-const buttonVisibility: Record<ButtonKey, boolean> = {
-  roll: true,
-  reroll: true,
-  add: true,
-  delete: true,
-  undo: true,
-  redo: true,
-  clear: true,
+  clear: 'Clear Table',
 };
 
 // Поворот (x, y, z) в радианах, чтобы грань с этим значением смотрела на камеру (+Z).
@@ -109,7 +94,6 @@ export const config = {
     diceFaces,
   },
   buttons,
-  buttonVisibility,
   ui: {
     fontScale: 1,
     panels: {
