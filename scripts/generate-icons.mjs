@@ -121,8 +121,8 @@ try {
   render(masters.dark.master, { theme: 'dark', radius });
   render(masters.dark.maskable, { theme: 'dark', fill: 0.78 });
 
-  const iosMaster = join(tmp, 'die-light-ios.png');
-  render(iosMaster, { theme: 'light' });
+  const iosMaster = join(tmp, 'die-glyph.png');
+  render(iosMaster, { theme: 'glyph', fill: 0.78 });
 
   if (target === 'probe') {
     const probes = [];
@@ -146,13 +146,17 @@ try {
 
   const resize = (w, h, src, out) => run('sips', ['-z', String(h), String(w), src, '--out', out]);
 
-  const lightOutputs = [
+  const anyOutputs = [
     [512, 512, join(root, 'public', 'icons', 'icon-512.png')],
     [192, 192, join(root, 'public', 'icons', 'icon-192.png')],
+  ];
+  for (const [w, h, out] of anyOutputs) resize(w, h, iosMaster, out);
+
+  const faviconOutputs = [
     [32, 32, join(root, 'public', 'icons', 'favicon-32.png')],
     [16, 16, join(root, 'public', 'icons', 'favicon-16.png')],
   ];
-  for (const [w, h, out] of lightOutputs) resize(w, h, masters.light.master, out);
+  for (const [w, h, out] of faviconOutputs) resize(w, h, masters.light.master, out);
 
   const darkOutputs = [
     [512, 512, join(root, 'public', 'icons', 'icon-dark-512.png')],

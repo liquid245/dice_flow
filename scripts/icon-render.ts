@@ -43,6 +43,17 @@ const THEMES: Record<string, ThemeConfig> = {
     ambient: 0.6,
     key: 2,
   },
+  glyph: {
+    body: null,
+    pips: null,
+    roughness: null,
+    envIntensity: 1.2,
+    background: null,
+    flat: false,
+    shadowOpacity: 0,
+    ambient: 0.7,
+    key: 1.8,
+  },
 };
 
 function mergeByMaterial(scene: THREE.Object3D): LodGroup[] {
@@ -189,12 +200,10 @@ function main() {
   camera.position.set(0, 0, 50);
   camera.lookAt(0, 0, 0);
 
-  if (theme.background !== null) {
-    scene.add(new THREE.AmbientLight(0xffffff, theme.ambient));
-    const key = new THREE.DirectionalLight(0xffffff, theme.key);
-    key.position.set(5, 5, 10);
-    scene.add(key);
-  }
+  scene.add(new THREE.AmbientLight(0xffffff, theme.ambient));
+  const key = new THREE.DirectionalLight(0xffffff, theme.key);
+  key.position.set(5, 5, 10);
+  scene.add(key);
 
   const loader = new GLTFLoader();
 
