@@ -7,6 +7,7 @@ const MIN_FONT = 6;
 const MAX_FONT = 16;
 const LINE_HEIGHT = 20;
 const LINE_FACTOR = LINE_HEIGHT / MAX_FONT;
+const CENTER_LINE_LIMIT = 3;
 const FIT_LIMIT = 2 / 3;
 const EXPANDED_KEY = 'diceflow:ui:historyExpanded';
 
@@ -100,8 +101,17 @@ export function InfoPanel() {
         contentBox.style.lineHeight = '';
         root.style.height = '';
         contentBox.style.height = `${historyRowLimit() * LINE_HEIGHT}px`;
+        contentBox.style.justifyContent = 'flex-start';
+        const contentHeight = contentBox.scrollHeight;
+        const overflows = contentHeight > contentBox.clientHeight;
+        contentBox.style.justifyContent = overflows
+          ? 'flex-start'
+          : contentHeight / LINE_HEIGHT <= CENTER_LINE_LIMIT
+            ? 'center'
+            : 'flex-end';
       } else {
         contentBox.style.lineHeight = singleRow ? 'normal' : '';
+        contentBox.style.justifyContent = '';
         root.style.height = `${collapsedH}px`;
         root.style.setProperty('--panel-band', '0px');
       }
@@ -162,7 +172,7 @@ export function InfoPanel() {
   }, [expanded, chunkKey]);
 
   const modifiers = [
-    feed.active ? 'info-panel--active' : '',
+    'info-panel--active',
     expanded ? 'info-panel--expanded' : '',
   ]
     .filter(Boolean)
@@ -174,7 +184,6 @@ export function InfoPanel() {
       className={`info-panel ${modifiers}`}
       aria-expanded={expanded}
       onClick={() => {
-        if (!feed.active) return;
         setExpanded((value) => {
           writeHistoryExpanded(!value);
           return !value;
