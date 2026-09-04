@@ -262,8 +262,13 @@ describe('engine', () => {
     engine.dispatch({ type: 'add', count: 2 });
     expect(engine.canUndo()).toBe(true);
 
-    engine.restore({ dice: [], history: [], selection: noneSelection });
-    expect(engine.getState().dice).toHaveLength(0);
+    engine.restore({
+      dice: [{ id: 'd1', type: 'd6', value: 3, origin: 'add' }],
+      history: [],
+      selection: { kind: 'ids', ids: new Set(['d1']) },
+    });
+    expect(engine.getState().dice).toHaveLength(1);
+    expect(engine.getState().selection).toEqual(noneSelection);
     expect(engine.canUndo()).toBe(false);
     expect(engine.canRedo()).toBe(false);
   });

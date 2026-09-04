@@ -5,7 +5,7 @@ import { createInitialState, normalizeState } from './state';
 import type { EngineDeps } from './deps';
 import { reduce } from './reducer';
 import type { Die } from '../dice/types';
-import { selectedDice } from '../selection/selection';
+import { noneSelection, selectedDice } from '../selection/selection';
 
 export interface GameEngine {
   getState(): GameState;
@@ -109,7 +109,7 @@ export function createEngine(deps: EngineDeps, initial: GameState = createInitia
       lastAction = null;
     },
     restore(restored: GameState) {
-      state = normalizeState(restored);
+      state = { ...normalizeState(restored), selection: noneSelection };
       undoStack.length = 0;
       redoStack = [];
       lastAction = null;
