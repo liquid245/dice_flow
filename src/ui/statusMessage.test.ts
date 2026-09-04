@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { pickStatusMessage } from './statusMessage';
 import type { StatusMessageKey } from '../config';
 
-const ALL: readonly StatusMessageKey[] = ['muted', 'ready', 'downloading', 'version'];
+const ALL: readonly StatusMessageKey[] = ['selection', 'muted', 'ready', 'downloading', 'version'];
 
-const none = { downloading: false, ready: false, muted: false };
+const none = { downloading: false, ready: false, muted: false, selection: false };
 
 describe('pickStatusMessage', () => {
   it('falls back to version when nothing else is active', () => {
@@ -15,18 +15,27 @@ describe('pickStatusMessage', () => {
     expect(pickStatusMessage(ALL, { ...none, muted: true })).toBe('muted');
     expect(pickStatusMessage(ALL, { ...none, ready: true })).toBe('ready');
     expect(pickStatusMessage(ALL, { ...none, downloading: true })).toBe('downloading');
+    expect(pickStatusMessage(ALL, { ...none, selection: true })).toBe('selection');
   });
 
   it('prefers muted over ready and downloading when muted is on top', () => {
-    expect(pickStatusMessage(ALL, { downloading: true, ready: true, muted: true })).toBe('muted');
+    expect(pickStatusMessage(ALL, { downloading: true, ready: true, muted: true, selection: false })).toBe('muted');
+  });
+
+  it('prefers selection over every other message', () => {
+    expect(
+      pickStatusMessage(ALL, { downloading: true, ready: true, muted: true, selection: true }),
+    ).toBe('selection');
   });
 
   it('honours the configured order when it differs', () => {
     const order: readonly StatusMessageKey[] = ['ready', 'downloading', 'muted', 'version'];
-    expect(pickStatusMessage(order, { downloading: true, ready: false, muted: true })).toBe(
+    expect(pickStatusMessage(order, { downloading: true, ready: false, muted: true, selection: false })).toBe(
       'downloading',
     );
-    expect(pickStatusMessage(order, { downloading: true, ready: true, muted: true })).toBe('ready');
+    expect(
+      pickStatusMessage(order, { downloading: true, ready: true, muted: true, selection: false }),
+    ).toBe('ready');
   });
 
   it('respects a version entry placed above other messages', () => {

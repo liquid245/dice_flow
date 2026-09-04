@@ -2,7 +2,7 @@ type DiceFaceRotation = [number, number, number];
 
 const base = import.meta.env.BASE_URL || '/';
 
-export type StatusMessageKey = 'version' | 'downloading' | 'ready' | 'muted';
+export type StatusMessageKey = 'version' | 'downloading' | 'ready' | 'muted' | 'selection';
 
 type Label = string | ((selectedCount: number) => string);
 
@@ -105,8 +105,9 @@ export const config = {
     },
     statusLine: {
       // Messages that replace the version number, top = higher priority.
+      // "selection" shows a countdown bar while dice are selected and must stay first.
       // "version" is the always-on fallback and must normally stay last.
-      priority: ['muted', 'ready', 'downloading', 'version'] as StatusMessageKey[],
+      priority: ['selection', 'muted', 'ready', 'downloading', 'version'] as StatusMessageKey[],
     },
     history: {
       verbs: {
