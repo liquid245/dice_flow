@@ -253,29 +253,7 @@ function addWhiteRing(data: ImageData, thickness: number): void {
   }
 }
 
-function paintPipGradient(data: ImageData, topGray: number, bottomGray: number): void {
-  const w = data.width;
-  const h = data.height;
-  const n = w * h;
-  for (let i = 0; i < n; i++) {
-    if (data.data[i * 4 + 3] < 250) continue;
-    const y = (i / w) | 0;
-    const t = h > 1 ? y / (h - 1) : 0;
-    const gray = Math.max(0, Math.min(255, Math.round(topGray + (bottomGray - topGray) * t)));
-    data.data[i * 4] = gray;
-    data.data[i * 4 + 1] = gray;
-    data.data[i * 4 + 2] = gray;
-  }
-}
-
-function composeAlphaBody(
-  passA: ImageData,
-  passB: ImageData,
-  amount: number,
-  ring: number,
-  gradTop: number,
-  gradBottom: number,
-): HTMLCanvasElement | null {
+function composeAlphaBody(passA: ImageData, passB: ImageData, amount: number, ring: number): HTMLCanvasElement | null {
   const n = passA.width * passA.height;
   const out = new ImageData(passA.width, passA.height);
   const a = passA.data;
@@ -285,9 +263,9 @@ function composeAlphaBody(
     const j = i * 4;
     if (a[j + 3] <= 8) continue;
     if (b[j + 3] > 24) {
-      o[j] = 128;
-      o[j + 1] = 128;
-      o[j + 2] = 128;
+      o[j] = a[j];
+      o[j + 1] = a[j + 1];
+      o[j + 2] = a[j + 2];
       o[j + 3] = 255;
       continue;
     }
@@ -299,7 +277,6 @@ function composeAlphaBody(
     o[j + 3] = Math.max(0, Math.min(255, alpha));
   }
   dropSmallComponents(out, 0.45);
-  paintPipGradient(out, gradTop, gradBottom);
   addWhiteRing(out, ring);
   return canvasFromImageData(out);
 }
@@ -313,8 +290,6 @@ function renderGlyphCut(
   groups: LodGroup[],
   amount: number,
   ring: number,
-  gradTop: number,
-  gradBottom: number,
 ): void {
   renderer.render(scene, camera);
   const passA = snapshotCanvas(canvas);
@@ -343,7 +318,7 @@ function renderGlyphCut(
 
   if (!passB) return;
 
-  const composed = composeAlphaBody(passA, passB, amount, ring, gradTop, gradBottom);
+  const composed = composeAlphaBody(passA, passB, amount, ring);
   if (!composed) return;
   canvas.remove();
   document.body.appendChild(composed);
@@ -358,14 +333,8 @@ function main() {
   const view = Math.max(0, Math.min(6, parseInt(params.get('view') ?? '6', 10) || 6));
   const face = parseInt(params.get('face') ?? '-1', 10);
   const cut = Math.min(Math.max(parseFloat(params.get('cut') ?? '0') || 0, 0), 5);
-  const ringValue = parseFloat(params.get('ring') ?? '0');
+  const ringValue = parseFloat(params.get('ring') ?? '2');
   const ring = Number.isFinite(ringValue) ? Math.min(Math.max(ringValue, 0), 30) : 5;
-  const readGray = (name: string, fallback: number) => {
-    const v = parseFloat(params.get(name) ?? String(fallback));
-    return Number.isFinite(v) ? Math.max(0, Math.min(255, v)) : fallback;
-  };
-  const gradTop = readGray('gradtop', 235);
-  const gradBottom = readGray('gradbot', 60);
 
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
@@ -459,7 +428,7 @@ function main() {
 
       renderer.render(scene, camera);
       if (themeName === 'glyph') {
-        renderGlyphCut(canvas, renderer, scene, camera, group, groups, cut, ring, gradTop, gradBottom);
+        renderGlyphCut(canvas, renderer, scene, camera, group, groups, cut, ring);
       }
       (window as unknown as { __iconDone?: boolean }).__iconDone = true;
     },
