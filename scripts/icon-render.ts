@@ -142,14 +142,146 @@ function makeShadowTexture(): THREE.Texture {
   return new THREE.CanvasTexture(canvas);
 }
 
+function snapshotCanvas(canvas: HTMLCanvasElement): ImageData | null {
+  const layer = document.createElement('canvas');
+  layer.width = canvas.width;
+  layer.height = canvas.height;
+  const ctx = layer.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(canvas, 0, 0);
+  return ctx.getImageData(0, 0, layer.width, layer.height);
+}
+
+function canvasFromImageData(data: ImageData): HTMLCanvasElement | null {
+  const layer = document.createElement('canvas');
+  layer.width = data.width;
+  layer.height = data.height;
+  const ctx = layer.getContext('2d');
+  if (!ctx) return null;
+  ctx.putImageData(data, 0, 0);
+  return layer;
+}
+
+function dropSmallComponents(data: ImageData, keepFrac: number): void {
+  const w = data.width;
+  const h = data.height;
+  const n = w * h;
+  const compId = new Int32Array(n).fill(-1);
+  const areas: number[] = [];
+  const stack: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (compId[i] !== -1 || data.data[i * 4 + 3] < 250) continue;
+    const id = areas.length;
+    let area = 0;
+    stack.length = 0;
+    stack.push(i);
+    compId[i] = id;
+    while (stack.length) {
+      const q = stack.pop() as number;
+      area++;
+      const qy = (q / w) | 0;
+      const qx = q - qy * w;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = qx + dx;
+          const ny = qy + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const qq = ny * w + nx;
+          if (compId[qq] === -1 && data.data[qq * 4 + 3] >= 250) {
+            compId[qq] = id;
+            stack.push(qq);
+          }
+        }
+      }
+    }
+    areas.push(area);
+  }
+  const maxArea = areas.length ? Math.max(...areas) : 0;
+  const threshold = maxArea * keepFrac;
+  for (let i = 0; i < n; i++) {
+    const id = compId[i];
+    if (id !== -1 && areas[id] < threshold) data.data[i * 4 + 3] = 0;
+  }
+}
+
+function composeAlphaBody(passA: ImageData, passB: ImageData, amount: number): HTMLCanvasElement | null {
+  const n = passA.width * passA.height;
+  const out = new ImageData(passA.width, passA.height);
+  const a = passA.data;
+  const b = passB.data;
+  const o = out.data;
+  for (let i = 0; i < n; i++) {
+    const j = i * 4;
+    if (a[j + 3] <= 8) continue;
+    if (b[j + 3] > 24) {
+      o[j] = a[j];
+      o[j + 1] = a[j + 1];
+      o[j + 2] = a[j + 2];
+      o[j + 3] = 255;
+      continue;
+    }
+    const L = 0.299 * a[j] + 0.587 * a[j + 1] + 0.114 * a[j + 2];
+    const alpha = ((1 - L / 255) * amount * 255 + 0.5) | 0;
+    o[j] = 255;
+    o[j + 1] = 255;
+    o[j + 2] = 255;
+    o[j + 3] = Math.max(0, Math.min(255, alpha));
+  }
+  dropSmallComponents(out, 0.45);
+  return canvasFromImageData(out);
+}
+
+function renderGlyphCut(
+  canvas: HTMLCanvasElement,
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.OrthographicCamera,
+  group: THREE.Group,
+  groups: LodGroup[],
+  amount: number,
+): void {
+  renderer.render(scene, camera);
+  const passA = snapshotCanvas(canvas);
+  if (!passA) return;
+
+  const meshes = group.children as THREE.Mesh[];
+  const saved: (THREE.Material | null)[] = [];
+  for (let i = 0; i < groups.length; i++) {
+    const mesh = meshes[i];
+    if (isPips(groups[i].material)) {
+      saved.push(mesh.material);
+      mesh.material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    } else {
+      saved.push(null);
+      mesh.visible = false;
+    }
+  }
+
+  renderer.render(scene, camera);
+  const passB = snapshotCanvas(canvas);
+
+  for (let i = 0; i < meshes.length; i++) {
+    if (saved[i]) meshes[i].material = saved[i] as THREE.Material;
+    else meshes[i].visible = true;
+  }
+
+  if (!passB) return;
+
+  const composed = composeAlphaBody(passA, passB, amount);
+  if (!composed) return;
+  canvas.remove();
+  document.body.appendChild(composed);
+}
+
 function main() {
   const params = new URLSearchParams(window.location.search);
   const themeName = params.get('theme') ?? 'light';
   const theme = THEMES[themeName] ?? THEMES.light;
-  const fill = Math.min(Math.max(parseFloat(params.get('fill') ?? '1') || 1, 0.1), 1);
+  const fill = Math.min(Math.max(parseFloat(params.get('fill') ?? '1') || 1, 0.1), 3);
   const radius = Math.min(Math.max(parseFloat(params.get('radius') ?? '0') || 0, 0), 0.5);
   const view = Math.max(0, Math.min(6, parseInt(params.get('view') ?? '6', 10) || 6));
   const face = parseInt(params.get('face') ?? '-1', 10);
+  const cut = Math.min(Math.max(parseFloat(params.get('cut') ?? '0') || 0, 0), 5);
 
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
@@ -242,6 +374,9 @@ function main() {
       }
 
       renderer.render(scene, camera);
+      if (themeName === 'glyph') {
+        renderGlyphCut(canvas, renderer, scene, camera, group, groups, cut);
+      }
       (window as unknown as { __iconDone?: boolean }).__iconDone = true;
     },
     (error) => reportError('parse: ' + String(error)),
