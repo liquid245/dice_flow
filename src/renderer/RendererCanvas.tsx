@@ -92,7 +92,8 @@ export function RendererCanvas() {
   };
 
   return (
-    <div ref={containerRef} className="table" {...pointerHandlers}>
+    <div className="table" {...pointerHandlers}>
+      <div ref={containerRef} className="table-stage" />
       <StatusLine />
     </div>
   );
