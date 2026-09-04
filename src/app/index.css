@@ -82,6 +82,7 @@ body {
   overflow-y: auto;
   touch-action: pan-y;
   overscroll-behavior: contain;
+  transition: padding-top 180ms ease-out;
 }
 
 .history-line {

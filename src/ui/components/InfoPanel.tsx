@@ -7,7 +7,6 @@ const MIN_FONT = 6;
 const MAX_FONT = 16;
 const LINE_HEIGHT = 20;
 const LINE_FACTOR = LINE_HEIGHT / MAX_FONT;
-const CENTER_LINE_LIMIT = 3;
 const FIT_LIMIT = 2 / 3;
 const EXPANDED_KEY = 'diceflow:ui:historyExpanded';
 
@@ -104,14 +103,14 @@ export function InfoPanel() {
         contentBox.style.justifyContent = 'flex-start';
         const contentHeight = contentBox.scrollHeight;
         const overflows = contentHeight > contentBox.clientHeight;
-        contentBox.style.justifyContent = overflows
-          ? 'flex-start'
-          : contentHeight / LINE_HEIGHT <= CENTER_LINE_LIMIT
-            ? 'center'
-            : 'flex-end';
+        const centerBottom = (historyRowLimit() * LINE_HEIGHT + LINE_HEIGHT) / 2;
+        contentBox.style.paddingTop = overflows
+          ? '0px'
+          : `${Math.max(0, centerBottom - contentHeight)}px`;
       } else {
         contentBox.style.lineHeight = singleRow ? 'normal' : '';
         contentBox.style.justifyContent = '';
+        contentBox.style.paddingTop = '0px';
         root.style.height = `${collapsedH}px`;
         root.style.setProperty('--panel-band', '0px');
       }
@@ -155,7 +154,7 @@ export function InfoPanel() {
       observer.disconnect();
       window.removeEventListener('resize', fit);
     };
-  }, [feed.summary, feed.system, expanded]);
+  }, [feed.summary, feed.system, feed.rows.length, expanded]);
 
   useLayoutEffect(() => {
     const box = contentRef.current;
