@@ -35,13 +35,13 @@ export default defineConfig({
         scope: '/dice_flow/',
         icons: [
           {
-            src: 'icons/icon-192.png',
+            src: 'icons/icon-192-ring2.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any',
           },
           {
-            src: 'icons/icon-512.png',
+            src: 'icons/icon-512-ring2.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any',

@@ -123,7 +123,7 @@ try {
   render(masters.dark.maskable, { theme: 'dark', fill: 0.78 });
 
   const iosMaster = join(tmp, 'die-glyph.png');
-  render(iosMaster, { theme: 'glyph', fill: 1.0, ring: 8 });
+  render(iosMaster, { theme: 'glyph', fill: 1.0, ring: 2 });
 
   if (target === 'probe') {
     const probes = [];
@@ -148,8 +148,8 @@ try {
   const resize = (w, h, src, out) => run('sips', ['-z', String(h), String(w), src, '--out', out]);
 
   const anyOutputs = [
-    [512, 512, join(root, 'public', 'icons', 'icon-512.png')],
-    [192, 192, join(root, 'public', 'icons', 'icon-192.png')],
+    [512, 512, join(root, 'public', 'icons', 'icon-512-ring2.png')],
+    [192, 192, join(root, 'public', 'icons', 'icon-192-ring2.png')],
   ];
   for (const [w, h, out] of anyOutputs) resize(w, h, iosMaster, out);
 
@@ -171,8 +171,8 @@ try {
   resize(512, 512, masters.dark.maskable, join(root, 'public', 'icons', 'maskable-dark-512.png'));
 
   const iosOutputs = [
-    [180, 180, join(root, 'public', 'icons', 'apple-touch-icon-180.png')],
-    [152, 152, join(root, 'public', 'icons', 'apple-touch-icon-152.png')],
+    [180, 180, join(root, 'public', 'icons', 'apple-touch-icon-180-ring2.png')],
+    [152, 152, join(root, 'public', 'icons', 'apple-touch-icon-152-ring2.png')],
   ];
   for (const [w, h, out] of iosOutputs) resize(w, h, iosMaster, out);
 
