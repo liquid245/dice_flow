@@ -38,14 +38,13 @@ function waitForServer() {
   });
 }
 
-function render(out, { theme = 'light', fill = null, view = null, face = null, radius = 0, pip = null } = {}) {
+function render(out, { theme = 'light', fill = null, view = null, face = null, radius = 0 } = {}) {
   const params = new URLSearchParams();
   params.set('theme', theme);
   if (fill) params.set('fill', String(fill));
   if (view !== null) params.set('view', String(view));
   if (face !== null) params.set('face', String(face));
   if (radius > 0) params.set('radius', String(radius));
-  if (pip) params.set('pip', String(pip));
   const url = `http://127.0.0.1:${port}/icon-render.html?${params}`;
   run(chrome, [
     '--headless=new',
@@ -123,7 +122,7 @@ try {
   render(masters.dark.maskable, { theme: 'dark', fill: 0.78 });
 
   const iosMaster = join(tmp, 'die-glyph.png');
-  render(iosMaster, { theme: 'glyph', fill: 1.0, pip: '000000' });
+  render(iosMaster, { theme: 'glyph', fill: 1.0 });
 
   if (target === 'probe') {
     const probes = [];
